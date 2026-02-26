@@ -1,34 +1,63 @@
-const JOURNAL_KEY = 'trade_journal_v2';
-const TOR_KEY = 'market_tor_v1';
+const JOURNAL_KEY = 'trade_journal_v3';
+const SETTINGS_KEY = 'trade_settings_v1';
 
-const defaultTor = { green: 1.2, yellow: 1.0, red: 0.7 };
+const defaultSettings = {
+  baseRisk: 1.0,
+  weekBoost: 0.5,
+  tor: { green: 1.2, yellow: 1.0, red: 0.7 },
+  accent: '#7c8bff',
+};
 
 const menuButtons = [...document.querySelectorAll('.menu-btn')];
 const views = [...document.querySelectorAll('.view')];
 
-const calcForm = document.getElementById('calc-form');
 const modeEl = document.getElementById('mode');
 const signalEl = document.getElementById('signal');
 const riskEl = document.getElementById('riskPercent');
+const calcForm = document.getElementById('calc-form');
 const calcResult = document.getElementById('calc-result');
-
-const journalForm = document.getElementById('journal-form');
-const journalBody = document.getElementById('journal-body');
-const clearAllBtn = document.getElementById('clear-all');
+const appliedRiskBadge = document.getElementById('appliedRiskBadge');
+const dashModeBadge = document.getElementById('dashModeBadge');
 
 const dTotal = document.getElementById('dTotal');
 const dWin = document.getElementById('dWin');
 const dPnl = document.getElementById('dPnl');
 const dAvg = document.getElementById('dAvg');
+const torGreenView = document.getElementById('torGreenView');
+const torYellowView = document.getElementById('torYellowView');
+const torRedView = document.getElementById('torRedView');
+const baseRiskView = document.getElementById('baseRiskView');
+const weekBoostView = document.getElementById('weekBoostView');
 
-const torGreen = document.getElementById('torGreen');
-const torYellow = document.getElementById('torYellow');
-const torRed = document.getElementById('torRed');
-const saveTorBtn = document.getElementById('save-tor');
-const torStatus = document.getElementById('tor-status');
+const journalForm = document.getElementById('journal-form');
+const journalBody = document.getElementById('journal-body');
+const clearAllBtn = document.getElementById('clear-all');
+
+const settingsForm = document.getElementById('settings-form');
+const setBaseRisk = document.getElementById('setBaseRisk');
+const setWeekBoost = document.getElementById('setWeekBoost');
+const setTorGreen = document.getElementById('setTorGreen');
+const setTorYellow = document.getElementById('setTorYellow');
+const setTorRed = document.getElementById('setTorRed');
+const setAccent = document.getElementById('setAccent');
+const resetSettingsBtn = document.getElementById('reset-settings');
+const settingsStatus = document.getElementById('settings-status');
 
 function formatKRW(n) {
   return `${Number(n).toLocaleString('ko-KR')}원`;
+}
+
+function loadSettings() {
+  const saved = JSON.parse(localStorage.getItem(SETTINGS_KEY) || '{}');
+  return {
+    ...defaultSettings,
+    ...saved,
+    tor: { ...defaultSettings.tor, ...(saved.tor || {}) },
+  };
+}
+
+function saveSettings(settings) {
+  localStorage.setItem(SETTINGS_KEY, JSON.stringify(settings));
 }
 
 function loadRows() {
@@ -39,27 +68,41 @@ function saveRows(rows) {
   localStorage.setItem(JOURNAL_KEY, JSON.stringify(rows));
 }
 
-function loadTor() {
-  return { ...defaultTor, ...(JSON.parse(localStorage.getItem(TOR_KEY) || '{}')) };
+function getAppliedRiskPercent() {
+  const settings = loadSettings();
+  const rawRisk = Number(riskEl.value || settings.baseRisk);
+  const modeBoost = modeEl.value === 'WEEK' ? settings.weekBoost : 0;
+  return rawRisk + modeBoost;
 }
 
-function saveTor(tor) {
-  localStorage.setItem(TOR_KEY, JSON.stringify(tor));
+function updateRiskPreview() {
+  const applied = getAppliedRiskPercent();
+  appliedRiskBadge.textContent = `적용 리스크 ${applied.toFixed(2)}%`;
+  dashModeBadge.textContent = `${modeEl.value} 모드`;
 }
 
-function applyModeRules() {
-  if (modeEl.value === 'WEEK') {
-    riskEl.value = '2.5';
-    riskEl.readOnly = true;
-  } else {
-    riskEl.readOnly = false;
-    if (!riskEl.value || Number(riskEl.value) <= 0) riskEl.value = '1';
-  }
+function applyThemeFromSettings() {
+  const settings = loadSettings();
+  document.documentElement.style.setProperty('--accent', settings.accent);
 }
 
-function calcPnl({ side, entry, exit, qty, fee }) {
-  const diff = side === 'Long' ? exit - entry : entry - exit;
-  return diff * qty - fee;
+function fillSettingsForm() {
+  const settings = loadSettings();
+  setBaseRisk.value = settings.baseRisk;
+  setWeekBoost.value = settings.weekBoost;
+  setTorGreen.value = settings.tor.green;
+  setTorYellow.value = settings.tor.yellow;
+  setTorRed.value = settings.tor.red;
+  setAccent.value = settings.accent;
+}
+
+function syncDashboardConfigView() {
+  const settings = loadSettings();
+  torGreenView.textContent = settings.tor.green.toFixed(1);
+  torYellowView.textContent = settings.tor.yellow.toFixed(1);
+  torRedView.textContent = settings.tor.red.toFixed(1);
+  baseRiskView.textContent = `${Number(settings.baseRisk).toFixed(1)}%`;
+  weekBoostView.textContent = `+${Number(settings.weekBoost).toFixed(1)}%`;
 }
 
 function renderStats(rows) {
@@ -90,7 +133,7 @@ function renderRows() {
       <td class="${pnlClass}">${formatKRW(row.pnl.toFixed(0))}</td>
       <td class="muted">${row.tag || '-'}</td>
       <td class="muted">${row.note || '-'}</td>
-      <td><button class="small-btn ghost" data-remove="${idx}">삭제</button></td>
+      <td><button class="small-btn btn-ghost" data-remove="${idx}">삭제</button></td>
     `;
     journalBody.appendChild(tr);
   });
@@ -98,11 +141,9 @@ function renderRows() {
   renderStats(rows);
 }
 
-function initTorUI() {
-  const tor = loadTor();
-  torGreen.value = tor.green;
-  torYellow.value = tor.yellow;
-  torRed.value = tor.red;
+function calcPnl({ side, entry, exit, qty, fee }) {
+  const diff = side === 'Long' ? exit - entry : entry - exit;
+  return diff * qty - fee;
 }
 
 menuButtons.forEach((btn) => {
@@ -113,32 +154,23 @@ menuButtons.forEach((btn) => {
   });
 });
 
-saveTorBtn.addEventListener('click', () => {
-  const tor = {
-    green: Number(torGreen.value || 0),
-    yellow: Number(torYellow.value || 0),
-    red: Number(torRed.value || 0),
-  };
-  saveTor(tor);
-  torStatus.textContent = `저장 완료 · Green ${tor.green} / Yellow ${tor.yellow} / Red ${tor.red}`;
-});
-
-modeEl.addEventListener('change', applyModeRules);
+modeEl.addEventListener('change', updateRiskPreview);
+riskEl.addEventListener('input', updateRiskPreview);
 
 calcForm.addEventListener('submit', (e) => {
   e.preventDefault();
 
-  const torMap = loadTor();
-  const signal = signalEl.value;
-  const tor = Number(torMap[signal] || 1);
-
+  const settings = loadSettings();
   const capital = Number(document.getElementById('capital').value);
-  const riskPercent = Number(riskEl.value);
   const entry = Number(document.getElementById('entry').value);
   const stop = Number(document.getElementById('stop').value);
   const targetR = Number(document.getElementById('targetR').value || 2);
 
-  const baseRiskAmount = capital * (riskPercent / 100);
+  const signal = signalEl.value;
+  const tor = Number(settings.tor[signal] || 1);
+
+  const appliedRiskPercent = getAppliedRiskPercent();
+  const baseRiskAmount = capital * (appliedRiskPercent / 100);
   const adjustedRiskAmount = baseRiskAmount * tor;
   const perUnitRisk = Math.abs(entry - stop);
 
@@ -153,18 +185,19 @@ calcForm.addEventListener('submit', (e) => {
 
   calcResult.innerHTML = `
     모드: <strong>${modeEl.value}</strong><br>
+    적용 리스크: <strong>${appliedRiskPercent.toFixed(2)}%</strong> (WEEK는 설정값만큼 자연 가산)<br>
     시장 신호등: <strong>${signal.toUpperCase()}</strong> · TOR <strong>${tor}</strong><br>
-    기본 리스크: <strong>${riskPercent}% (${formatKRW(baseRiskAmount.toFixed(0))})</strong><br>
-    TOR 적용 리스크: <strong>${formatKRW(adjustedRiskAmount.toFixed(0))}</strong><br>
+    TOR 적용 리스크 금액: <strong>${formatKRW(adjustedRiskAmount.toFixed(0))}</strong><br>
     추천 수량: <strong>${qty.toFixed(4)}</strong><br>
     목표가(${targetR}R): <strong>${targetPrice.toFixed(2)}</strong><br>
     기대 수익: <strong>${formatKRW(expectedProfit.toFixed(0))}</strong>
   `;
+
+  updateRiskPreview();
 });
 
 journalForm.addEventListener('submit', (e) => {
   e.preventDefault();
-
   const item = {
     date: document.getElementById('jDate').value,
     symbol: document.getElementById('jSymbol').value.trim().toUpperCase(),
@@ -201,6 +234,48 @@ clearAllBtn.addEventListener('click', () => {
   renderRows();
 });
 
-applyModeRules();
-initTorUI();
-renderRows();
+settingsForm.addEventListener('submit', (e) => {
+  e.preventDefault();
+  const next = {
+    baseRisk: Number(setBaseRisk.value || defaultSettings.baseRisk),
+    weekBoost: Number(setWeekBoost.value || defaultSettings.weekBoost),
+    tor: {
+      green: Number(setTorGreen.value || defaultSettings.tor.green),
+      yellow: Number(setTorYellow.value || defaultSettings.tor.yellow),
+      red: Number(setTorRed.value || defaultSettings.tor.red),
+    },
+    accent: setAccent.value || defaultSettings.accent,
+  };
+
+  saveSettings(next);
+  applyThemeFromSettings();
+  syncDashboardConfigView();
+  updateRiskPreview();
+  settingsStatus.textContent = '설정이 저장되었습니다.';
+
+  if (!riskEl.value || Number(riskEl.value) <= 0) {
+    riskEl.value = String(next.baseRisk);
+  }
+});
+
+resetSettingsBtn.addEventListener('click', () => {
+  saveSettings(defaultSettings);
+  fillSettingsForm();
+  applyThemeFromSettings();
+  syncDashboardConfigView();
+  riskEl.value = String(defaultSettings.baseRisk);
+  updateRiskPreview();
+  settingsStatus.textContent = '기본값으로 복원되었습니다.';
+});
+
+function init() {
+  if (!localStorage.getItem(SETTINGS_KEY)) saveSettings(defaultSettings);
+  fillSettingsForm();
+  applyThemeFromSettings();
+  syncDashboardConfigView();
+  riskEl.value = String(loadSettings().baseRisk);
+  updateRiskPreview();
+  renderRows();
+}
+
+init();
