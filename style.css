@@ -12,6 +12,8 @@ body {
   margin: 0;
   color: var(--text);
   font-family: "Inter", "Pretendard", "Noto Sans KR", sans-serif;
+  font-size: 17px;
+  line-height: 1.6;
   background: radial-gradient(80% 80% at 0% 0%, #182446 0%, var(--bg) 55%);
 }
 .bg-orb {
@@ -26,12 +28,12 @@ body {
 .app {
   position: relative;
   z-index: 1;
-  max-width: 1320px;
+  max-width: 760px;
   margin: 0 auto;
-  padding: 24px;
+  padding: 20px 14px 36px;
   display: grid;
-  grid-template-columns: 280px 1fr;
-  gap: 16px;
+  grid-template-columns: 1fr;
+  gap: 12px;
 }
 .card-glass {
   background: linear-gradient(140deg, rgba(255,255,255,0.08), rgba(255,255,255,0.03));
@@ -40,20 +42,25 @@ body {
   backdrop-filter: blur(8px);
   box-shadow: 0 20px 35px rgba(0,0,0,0.25);
 }
-.sidebar { padding: 18px; height: fit-content; position: sticky; top: 16px; }
+.sidebar { padding: 16px; }
 .sidebar h1 { margin: 0; font-size: 1.3rem; }
-.menu { display: grid; gap: 8px; margin-top: 14px; }
+.menu {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px;
+  margin-top: 14px;
+}
 .menu-btn {
   border: 1px solid var(--line);
   color: var(--text);
   background: #101834;
   border-radius: 12px;
   padding: 10px 12px;
-  text-align: left;
+  text-align: center;
   cursor: pointer;
 }
 .menu-btn.active { background: linear-gradient(135deg, var(--accent), #6375ff); border-color: transparent; }
-.content { display: grid; gap: 14px; }
+.content { display: grid; gap: 10px; }
 .view { display: none; padding: 18px; }
 .view.active { display: block; }
 .section-head { display: flex; justify-content: space-between; align-items: center; gap: 10px; }
@@ -69,7 +76,7 @@ body {
 
 .stats-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+  grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: 10px;
   margin-top: 12px;
 }
@@ -86,18 +93,14 @@ body {
 .card-mini p { margin: 8px 0 0; font-size: 1.15rem; font-weight: 600; }
 .inline-cards { margin-top: 10px; display: grid; gap: 10px; grid-template-columns: 1fr 1fr; }
 
-.grid-form {
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
-  gap: 10px;
-}
+.grid-form { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
 label { display: grid; gap: 6px; color: var(--muted); font-size: 0.88rem; }
 input, select, textarea, button {
   border: 1px solid var(--line);
   border-radius: 10px;
   background: #0f1733;
   color: var(--text);
-  padding: 10px;
+  padding: 11px 12px;
 }
 .full { grid-column: 1 / -1; }
 .btn-primary {
@@ -124,7 +127,14 @@ th, td { border-bottom: 1px solid var(--line); text-align: left; padding: 10px 6
 .small-btn { padding: 6px 8px; font-size: 0.8rem; }
 
 @media (max-width: 980px) {
-  .app { grid-template-columns: 1fr; }
-  .sidebar { position: static; }
+  .app { max-width: 760px; }
   .inline-cards { grid-template-columns: 1fr; }
+}
+
+@media (max-width: 640px) {
+  body { font-size: 16px; }
+  .menu { grid-template-columns: 1fr; }
+  .grid-form { grid-template-columns: 1fr; }
+  .stats-grid { grid-template-columns: 1fr; }
+  .section-head { flex-direction: column; align-items: flex-start; }
 }
