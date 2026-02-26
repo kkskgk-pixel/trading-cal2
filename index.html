@@ -1,0 +1,104 @@
+<!doctype html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>트레이딩 계산기 & 저널</title>
+  <link rel="stylesheet" href="style.css" />
+</head>
+<body>
+  <main class="container">
+    <header class="hero">
+      <h1>트레이딩 계산기 & 저널</h1>
+      <p>리스크 관리부터 매매 복기까지 한 번에.</p>
+    </header>
+
+    <section class="card" aria-labelledby="calc-title">
+      <h2 id="calc-title">포지션 사이징 계산기</h2>
+      <form id="calc-form" class="grid">
+        <label>계좌 자본(원)
+          <input type="number" id="capital" min="0" step="1000" placeholder="10000000" required />
+        </label>
+        <label>허용 리스크(%)
+          <input type="number" id="riskPercent" min="0" step="0.1" placeholder="1" required />
+        </label>
+        <label>진입가
+          <input type="number" id="entry" min="0" step="0.01" placeholder="50000" required />
+        </label>
+        <label>손절가
+          <input type="number" id="stop" min="0" step="0.01" placeholder="48500" required />
+        </label>
+        <label>목표 R배수
+          <input type="number" id="targetR" min="0" step="0.1" placeholder="2" value="2" />
+        </label>
+        <button type="submit" class="primary">계산하기</button>
+      </form>
+
+      <div id="calc-result" class="result" aria-live="polite">
+        계산 결과가 여기에 표시됩니다.
+      </div>
+    </section>
+
+    <section class="card" aria-labelledby="journal-title">
+      <div class="row-between">
+        <h2 id="journal-title">매매 저널</h2>
+        <button id="clear-all" class="ghost" type="button">전체 삭제</button>
+      </div>
+
+      <form id="journal-form" class="grid">
+        <label>날짜
+          <input type="date" id="jDate" required />
+        </label>
+        <label>종목/티커
+          <input type="text" id="jSymbol" placeholder="BTCUSDT" required />
+        </label>
+        <label>매매 방향
+          <select id="jSide" required>
+            <option value="Long">Long</option>
+            <option value="Short">Short</option>
+          </select>
+        </label>
+        <label>진입가
+          <input type="number" id="jEntry" min="0" step="0.01" required />
+        </label>
+        <label>청산가
+          <input type="number" id="jExit" min="0" step="0.01" required />
+        </label>
+        <label>수량
+          <input type="number" id="jQty" min="0" step="0.0001" required />
+        </label>
+        <label>수수료(원)
+          <input type="number" id="jFee" min="0" step="1" value="0" />
+        </label>
+        <label>전략 태그
+          <input type="text" id="jTag" placeholder="돌파, 눌림, 역추세" />
+        </label>
+        <label class="full">복기 메모
+          <textarea id="jNote" rows="3" placeholder="진입 근거, 심리 상태, 개선점"></textarea>
+        </label>
+        <button type="submit" class="primary">저널 저장</button>
+      </form>
+
+      <div class="stats" id="stats">
+        <div><strong>총 거래</strong><span id="sTotal">0</span></div>
+        <div><strong>승률</strong><span id="sWin">0%</span></div>
+        <div><strong>누적 손익</strong><span id="sPnl">0원</span></div>
+        <div><strong>평균 손익</strong><span id="sAvg">0원</span></div>
+      </div>
+
+      <div class="table-wrap">
+        <table>
+          <thead>
+            <tr>
+              <th>날짜</th><th>티커</th><th>방향</th><th>손익</th><th>태그</th><th>메모</th><th></th>
+            </tr>
+          </thead>
+          <tbody id="journal-body"></tbody>
+        </table>
+      </div>
+    </section>
+  </main>
+
+  <script src="script.js"></script>
+</body>
+</html>
