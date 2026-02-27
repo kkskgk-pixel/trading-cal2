@@ -1,6 +1,6 @@
-const JOURNAL_KEY = 'trade_journal_v5';
-const SETTINGS_KEY = 'trade_settings_v3';
-const POSITIONS_KEY = 'trade_positions_v2';
+const JOURNAL_KEY = 'trade_journal_v6';
+const SETTINGS_KEY = 'trade_settings_v4';
+const POSITIONS_KEY = 'trade_positions_v3';
 
 const defaultSettings = {
   dayRisk: 1.0,
@@ -29,17 +29,19 @@ const closeRangeBtn = document.getElementById('close-range');
 const rangeBody = document.getElementById('range-body');
 
 const calcSymbolEl = document.getElementById('calcSymbol');
-const calcSideEl = document.getElementById('calcSide');
 
 const dTotal = document.getElementById('dTotal');
 const dWin = document.getElementById('dWin');
-const dPnl = document.getElementById('dPnl');
-const dAvg = document.getElementById('dAvg');
+const dPnlR = document.getElementById('dPnlR');
+const dAvgR = document.getElementById('dAvgR');
 const greenRiskView = document.getElementById('greenRiskView');
 const yellowRiskView = document.getElementById('yellowRiskView');
 const redRiskView = document.getElementById('redRiskView');
 const dayRiskView = document.getElementById('dayRiskView');
 const weekRiskView = document.getElementById('weekRiskView');
+const stepCumR = document.getElementById('stepCumR');
+const stepLevel = document.getElementById('stepLevel');
+const nextRiskScale = document.getElementById('nextRiskScale');
 
 const journalForm = document.getElementById('journal-form');
 const journalBody = document.getElementById('journal-body');
@@ -104,6 +106,20 @@ function getSignalDefaultRisk(signal) {
   return Number(settings.signalRisk[signal] || settings.signalRisk.green);
 }
 
+function getStepLevel(cumulativeR) {
+  if (cumulativeR >= 0) return Math.floor(cumulativeR / 10);
+  return Math.ceil(cumulativeR / 10);
+}
+
+function getRiskScaleByCumulativeR(cumulativeR) {
+  const step = getStepLevel(cumulativeR);
+  return Math.max(0.1, 1 + step * 0.1);
+}
+
+function getCumulativeR() {
+  return loadRows().reduce((sum, row) => sum + Number(row.rMultiple || 0), 0);
+}
+
 function applyRiskPreset() {
   if (riskModeEl.value === 'signal') {
     riskEl.value = String(getSignalDefaultRisk(signalEl.value));
@@ -113,13 +129,19 @@ function applyRiskPreset() {
 }
 
 function getAppliedRiskPercent() {
-  return Number(riskEl.value || 0);
+  const baseRisk = Number(riskEl.value || 0);
+  const scale = getRiskScaleByCumulativeR(getCumulativeR());
+  return baseRisk * scale;
 }
 
 function updateRiskPreview() {
-  const applied = getAppliedRiskPercent();
-  appliedRiskBadge.textContent = `적용 리스크 ${applied.toFixed(2)}%`;
+  const cumR = getCumulativeR();
+  const scale = getRiskScaleByCumulativeR(cumR);
+  appliedRiskBadge.textContent = `적용 리스크 ${getAppliedRiskPercent().toFixed(2)}%`;
   dashModeBadge.textContent = `${modeEl.value} 모드`;
+  stepCumR.textContent = `${cumR.toFixed(2)}R`;
+  stepLevel.textContent = String(getStepLevel(cumR));
+  nextRiskScale.textContent = `${scale.toFixed(2)}x`;
 }
 
 function applyThemeFromSettings() {
@@ -146,18 +168,24 @@ function syncDashboardConfigView() {
   weekRiskView.textContent = `${Number(settings.weekRisk).toFixed(1)}%`;
 }
 
+function calcRMultiple(entry, stop, exit) {
+  const risk = Math.abs(entry - stop);
+  if (risk <= 0) return 0;
+  return (exit - entry) / risk;
+}
+
 function renderStats(rows) {
   const total = rows.length;
-  const pnls = rows.map((r) => r.pnl);
-  const wins = pnls.filter((p) => p > 0).length;
-  const sum = pnls.reduce((a, b) => a + b, 0);
-  const avg = total ? sum / total : 0;
+  const rValues = rows.map((r) => Number(r.rMultiple || 0));
+  const wins = rValues.filter((r) => r > 0).length;
+  const sumR = rValues.reduce((a, b) => a + b, 0);
+  const avgR = total ? sumR / total : 0;
 
   dTotal.textContent = String(total);
   dWin.textContent = `${total ? ((wins / total) * 100).toFixed(1) : 0}%`;
-  dPnl.textContent = formatKRW(sum.toFixed(0));
-  dPnl.className = sum >= 0 ? 'pnl-positive' : 'pnl-negative';
-  dAvg.textContent = formatKRW(avg.toFixed(0));
+  dPnlR.textContent = `${sumR.toFixed(2)}R`;
+  dPnlR.className = sumR >= 0 ? 'pnl-positive' : 'pnl-negative';
+  dAvgR.textContent = `${avgR.toFixed(2)}R`;
 }
 
 function renderRows() {
@@ -166,11 +194,12 @@ function renderRows() {
 
   rows.forEach((row, idx) => {
     const tr = document.createElement('tr');
+    const rClass = row.rMultiple >= 0 ? 'pnl-positive' : 'pnl-negative';
     const pnlClass = row.pnl >= 0 ? 'pnl-positive' : 'pnl-negative';
     tr.innerHTML = `
       <td>${row.date}</td>
       <td>${row.symbol}</td>
-      <td>${row.side}</td>
+      <td class="${rClass}">${Number(row.rMultiple).toFixed(2)}R</td>
       <td class="${pnlClass}">${formatKRW(row.pnl.toFixed(0))}</td>
       <td class="muted">${row.tag || '-'}</td>
       <td class="muted">${row.note || '-'}</td>
@@ -191,7 +220,6 @@ function renderPositions() {
     tr.innerHTML = `
       <td>${row.createdAt}</td>
       <td>${row.symbol}</td>
-      <td>${row.side}</td>
       <td>${row.qty.toFixed(4)}</td>
       <td>${row.entry.toFixed(2)} / ${row.stop.toFixed(2)}</td>
       <td>${formatKRW(row.riskAmount.toFixed(0))}</td>
@@ -201,9 +229,8 @@ function renderPositions() {
   });
 }
 
-function calcPnl({ side, entry, exit, qty, fee }) {
-  const diff = side === 'Long' ? exit - entry : entry - exit;
-  return diff * qty - fee;
+function calcPnl({ entry, exit, qty, fee }) {
+  return (exit - entry) * qty - fee;
 }
 
 function getTargetPrice(entry, stop, r) {
@@ -215,7 +242,7 @@ function renderRangePopup(calc) {
   rangeBody.innerHTML = '';
   for (let r = 1; r <= 10; r += 1) {
     const targetPrice = getTargetPrice(calc.entry, calc.stop, r);
-    const expectedProfit = calc.adjustedRiskAmount * r;
+    const expectedProfit = calc.riskAmount * r;
     const tr = document.createElement('tr');
     tr.innerHTML = `
       <td>${r}R</td>
@@ -260,6 +287,13 @@ function importAllData(payload) {
   renderPositions();
 }
 
+function syncAllViews() {
+  syncDashboardConfigView();
+  renderRows();
+  renderPositions();
+  updateRiskPreview();
+}
+
 menuButtons.forEach((btn) => {
   btn.addEventListener('click', () => {
     const target = btn.dataset.view;
@@ -293,8 +327,8 @@ calcForm.addEventListener('submit', (e) => {
   const stop = Number(document.getElementById('stop').value);
   const targetR = Number(document.getElementById('targetR').value || 2);
 
-  const riskPercent = getAppliedRiskPercent();
-  const riskAmount = capital * (riskPercent / 100);
+  const appliedRiskPercent = getAppliedRiskPercent();
+  const riskAmount = capital * (appliedRiskPercent / 100);
   const perUnitRisk = Math.abs(entry - stop);
 
   if (perUnitRisk <= 0) {
@@ -303,33 +337,34 @@ calcForm.addEventListener('submit', (e) => {
   }
 
   const qty = riskAmount / perUnitRisk;
+  const positionAmount = qty * entry;
   const lossWidthPercent = entry ? (perUnitRisk / entry) * 100 : 0;
   const targetPrice = getTargetPrice(entry, stop, targetR);
   const expectedProfit = riskAmount * targetR;
 
   lastCalc = {
     symbol: calcSymbolEl.value.trim().toUpperCase(),
-    side: calcSideEl.value,
     mode: modeEl.value,
     signal: signalEl.value,
-    riskPercent,
+    appliedRiskPercent,
     capital,
     entry,
     stop,
     targetR,
     perUnitRisk,
     lossWidthPercent,
-    adjustedRiskAmount: riskAmount,
+    riskAmount,
     qty,
+    positionAmount,
   };
 
   calcResult.innerHTML = `
     모드: <strong>${modeEl.value}</strong> · 신호등: <strong>${signalEl.value.toUpperCase()}</strong><br>
-    적용 리스크: <strong>${riskPercent.toFixed(2)}%</strong><br>
+    적용 리스크: <strong>${appliedRiskPercent.toFixed(2)}%</strong><br>
     손실폭(가격차): <strong>${perUnitRisk.toFixed(2)}</strong> (${lossWidthPercent.toFixed(2)}%)<br>
     최대 손실금액: <strong>${formatKRW(riskAmount.toFixed(0))}</strong><br>
-    추천 수량: <strong>${qty.toFixed(4)}</strong><br>
-    목표가(${targetR}R): <strong>${targetPrice.toFixed(2)}</strong><br>
+    추천 수량: <strong>${qty.toFixed(4)}</strong> <span class="muted">(금액: ${formatKRW(positionAmount.toFixed(0))})</span><br>
+    도달가(${targetR}R): <strong>${targetPrice.toFixed(2)}</strong><br>
     기대 수익: <strong>${formatKRW(expectedProfit.toFixed(0))}</strong>
   `;
 
@@ -357,11 +392,10 @@ addPositionBtn.addEventListener('click', () => {
   rows.unshift({
     createdAt: new Date().toLocaleString('ko-KR'),
     symbol: lastCalc.symbol || '-',
-    side: lastCalc.side,
     qty: lastCalc.qty,
     entry: lastCalc.entry,
     stop: lastCalc.stop,
-    riskAmount: lastCalc.adjustedRiskAmount,
+    riskAmount: lastCalc.riskAmount,
   });
   savePositions(rows);
   renderPositions();
@@ -389,8 +423,8 @@ journalForm.addEventListener('submit', (e) => {
   const item = {
     date: document.getElementById('jDate').value,
     symbol: document.getElementById('jSymbol').value.trim().toUpperCase(),
-    side: document.getElementById('jSide').value,
     entry: Number(document.getElementById('jEntry').value),
+    stop: Number(document.getElementById('jStop').value),
     exit: Number(document.getElementById('jExit').value),
     qty: Number(document.getElementById('jQty').value),
     fee: Number(document.getElementById('jFee').value || 0),
@@ -399,11 +433,13 @@ journalForm.addEventListener('submit', (e) => {
   };
 
   item.pnl = calcPnl(item);
+  item.rMultiple = calcRMultiple(item.entry, item.stop, item.exit);
+
   const rows = loadRows();
   rows.unshift(item);
   saveRows(rows);
   journalForm.reset();
-  renderRows();
+  syncAllViews();
 });
 
 journalBody.addEventListener('click', (e) => {
@@ -413,13 +449,13 @@ journalBody.addEventListener('click', (e) => {
   const rows = loadRows();
   rows.splice(idx, 1);
   saveRows(rows);
-  renderRows();
+  syncAllViews();
 });
 
 clearAllBtn.addEventListener('click', () => {
   if (!confirm('저널 데이터를 모두 삭제할까요?')) return;
   localStorage.removeItem(JOURNAL_KEY);
-  renderRows();
+  syncAllViews();
 });
 
 settingsForm.addEventListener('submit', (e) => {
@@ -437,9 +473,8 @@ settingsForm.addEventListener('submit', (e) => {
 
   saveSettings(next);
   applyThemeFromSettings();
-  syncDashboardConfigView();
   applyRiskPreset();
-  updateRiskPreview();
+  syncAllViews();
   settingsStatus.textContent = '설정이 저장되었습니다.';
 });
 
@@ -447,9 +482,8 @@ resetSettingsBtn.addEventListener('click', () => {
   saveSettings(defaultSettings);
   fillSettingsForm();
   applyThemeFromSettings();
-  syncDashboardConfigView();
   applyRiskPreset();
-  updateRiskPreview();
+  syncAllViews();
   settingsStatus.textContent = '기본값으로 복원되었습니다.';
 });
 
@@ -480,11 +514,8 @@ function init() {
   if (!localStorage.getItem(SETTINGS_KEY)) saveSettings(defaultSettings);
   fillSettingsForm();
   applyThemeFromSettings();
-  syncDashboardConfigView();
   applyRiskPreset();
-  updateRiskPreview();
-  renderRows();
-  renderPositions();
+  syncAllViews();
 }
 
 init();

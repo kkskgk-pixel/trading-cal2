@@ -16,8 +16,8 @@
       <nav class="menu" aria-label="메뉴">
         <button class="menu-btn active" data-view="dashboard">📊 대시보드</button>
         <button class="menu-btn" data-view="calculator">🧮 계산기</button>
-        <button class="menu-btn" data-view="journal">📒 저널</button>
         <button class="menu-btn" data-view="positions">💼 포지션</button>
+        <button class="menu-btn" data-view="journal">📒 저널</button>
         <button class="menu-btn" data-view="settings">⚙️ 설정</button>
       </nav>
     </aside>
@@ -32,8 +32,8 @@
         <div class="stats-grid">
           <article><h3>총 거래</h3><p id="dTotal">0</p></article>
           <article><h3>승률</h3><p id="dWin">0%</p></article>
-          <article><h3>누적 손익</h3><p id="dPnl">0원</p></article>
-          <article><h3>평균 손익</h3><p id="dAvg">0원</p></article>
+          <article><h3>누적 수익(R)</h3><p id="dPnlR">0.00R</p></article>
+          <article><h3>평균 수익(R)</h3><p id="dAvgR">0.00R</p></article>
         </div>
 
         <div class="inline-cards">
@@ -46,6 +46,12 @@
             <p>DAY <span id="dayRiskView">1.0%</span> / WEEK <span id="weekRiskView">2.5%</span></p>
           </article>
         </div>
+
+        <div class="card-mini" style="margin-top:10px;">
+          <h3>누적손익 스텝 기준 (+10R / -10R)</h3>
+          <p>현재 누적 <strong id="stepCumR">0.00R</strong> · 스텝 <strong id="stepLevel">0</strong> · 다음 트레이드 리스크 배율 <strong id="nextRiskScale">1.00x</strong></p>
+          <p class="muted">규칙: +10R 도달마다 +10%, -10R 도달마다 -10% (스텝 기반 누적 적용)</p>
+        </div>
       </section>
 
       <section id="calculator" class="view card-glass">
@@ -57,12 +63,6 @@
         <form id="calc-form" class="grid-form">
           <label>티커
             <input type="text" id="calcSymbol" placeholder="BTCUSDT" required />
-          </label>
-          <label>방향
-            <select id="calcSide">
-              <option value="Long">Long</option>
-              <option value="Short">Short</option>
-            </select>
           </label>
           <label>모드
             <select id="mode">
@@ -100,11 +100,24 @@
             <input type="number" id="targetR" min="1" max="10" step="0.1" value="2" required />
           </label>
           <button class="btn-primary" type="submit">계산하기</button>
-          <button id="open-range" class="btn-ghost" type="button">R 1~10 목표가 보기</button>
+          <button id="open-range" class="btn-ghost" type="button">1R~10R 도달가 보기</button>
           <button id="add-position" class="btn-primary" type="button">현재 계산값으로 포지션 추가</button>
         </form>
 
         <div id="calc-result" class="result">계산 결과가 여기에 표시됩니다.</div>
+      </section>
+
+      <section id="positions" class="view card-glass">
+        <div class="section-head">
+          <h2>내 포지션 관리</h2>
+          <button id="clear-positions" class="btn-ghost" type="button">포지션 전체 삭제</button>
+        </div>
+        <div class="table-wrap">
+          <table>
+            <thead><tr><th>시간</th><th>티커</th><th>수량</th><th>진입/손절</th><th>리스크금액</th><th></th></tr></thead>
+            <tbody id="positions-body"></tbody>
+          </table>
+        </div>
       </section>
 
       <section id="journal" class="view card-glass">
@@ -116,10 +129,8 @@
         <form id="journal-form" class="grid-form">
           <label>날짜<input type="date" id="jDate" required /></label>
           <label>종목/티커<input type="text" id="jSymbol" placeholder="BTCUSDT" required /></label>
-          <label>방향
-            <select id="jSide"><option value="Long">Long</option><option value="Short">Short</option></select>
-          </label>
           <label>진입가<input type="number" id="jEntry" min="0" step="0.01" required /></label>
+          <label>손절가<input type="number" id="jStop" min="0" step="0.01" required /></label>
           <label>청산가<input type="number" id="jExit" min="0" step="0.01" required /></label>
           <label>수량<input type="number" id="jQty" min="0" step="0.0001" required /></label>
           <label>수수료(원)<input type="number" id="jFee" min="0" step="1" value="0" /></label>
@@ -130,21 +141,8 @@
 
         <div class="table-wrap">
           <table>
-            <thead><tr><th>날짜</th><th>티커</th><th>방향</th><th>손익</th><th>태그</th><th>메모</th><th></th></tr></thead>
+            <thead><tr><th>날짜</th><th>티커</th><th>R</th><th>손익(원)</th><th>태그</th><th>메모</th><th></th></tr></thead>
             <tbody id="journal-body"></tbody>
-          </table>
-        </div>
-      </section>
-
-      <section id="positions" class="view card-glass">
-        <div class="section-head">
-          <h2>내 포지션 관리</h2>
-          <button id="clear-positions" class="btn-ghost" type="button">포지션 전체 삭제</button>
-        </div>
-        <div class="table-wrap">
-          <table>
-            <thead><tr><th>시간</th><th>티커</th><th>방향</th><th>수량</th><th>진입/손절</th><th>리스크금액</th><th></th></tr></thead>
-            <tbody id="positions-body"></tbody>
           </table>
         </div>
       </section>
@@ -185,12 +183,12 @@
 
   <dialog id="range-dialog" class="range-dialog">
     <div class="section-head">
-      <h3>목표가 범위 (R 1~10)</h3>
+      <h3>도달가 범위 (1R~10R)</h3>
       <button id="close-range" class="btn-ghost" type="button">닫기</button>
     </div>
     <div class="table-wrap">
       <table>
-        <thead><tr><th>R 배수</th><th>목표가</th><th>기대수익(원)</th></tr></thead>
+        <thead><tr><th>R 배수</th><th>도달가</th><th>기대수익(원)</th></tr></thead>
         <tbody id="range-body"></tbody>
       </table>
     </div>
