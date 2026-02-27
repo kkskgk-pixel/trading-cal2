@@ -47,6 +47,13 @@ const clearAllBtn = document.getElementById('clear-all');
 
 const positionsBody = document.getElementById('positions-body');
 const clearPositionsBtn = document.getElementById('clear-positions');
+const closeDialog = document.getElementById('close-dialog');
+const closeDialogInfo = document.getElementById('close-dialog-info');
+const closeExitPriceEl = document.getElementById('close-exit-price');
+const closeDialogCloseBtn = document.getElementById('close-close-dialog');
+const closeRatioButtons = [...document.querySelectorAll('[data-close-ratio]')];
+
+let activeCloseIndex = null;
 
 const settingsForm = document.getElementById('settings-form');
 const setDayRisk = document.getElementById('setDayRisk');
@@ -201,6 +208,17 @@ function renderRows() {
   renderStats(rows);
 }
 
+
+function toDateString(date) {
+  return date.toISOString().slice(0, 10);
+}
+
+function addDays(dateStr, days) {
+  const d = new Date(dateStr);
+  d.setDate(d.getDate() + days);
+  return toDateString(d);
+}
+
 function renderPositions() {
   const rows = loadPositions();
   positionsBody.innerHTML = '';
@@ -208,12 +226,16 @@ function renderPositions() {
   rows.forEach((row, idx) => {
     const tr = document.createElement('tr');
     tr.innerHTML = `
-      <td>${row.createdAt}</td>
+      <td>${row.entryDate}</td>
+      <td>${row.sellDate}</td>
       <td>${row.symbol}</td>
-      <td>${row.qty.toFixed(4)}</td>
-      <td>${row.entry.toFixed(2)} / ${row.stop.toFixed(2)}</td>
-      <td>${formatKRW(row.riskAmount.toFixed(0))}</td>
-      <td><button class="small-btn btn-ghost" data-pos-remove="${idx}">삭제</button></td>
+      <td>${Math.floor(row.qty)}</td>
+      <td>${row.entry.toFixed(2)}</td>
+      <td>${row.stop.toFixed(2)}</td>
+      <td>
+        <button class="small-btn btn-primary" data-pos-close="${idx}">청산</button>
+        <button class="small-btn btn-ghost" data-pos-remove="${idx}">삭제</button>
+      </td>
     `;
     positionsBody.appendChild(tr);
   });
@@ -324,8 +346,14 @@ calcForm.addEventListener('submit', (e) => {
     return;
   }
 
-  const qty = riskAmount / perUnitRisk;
+  const qtyRaw = riskAmount / perUnitRisk;
+  const qty = Math.floor(qtyRaw);
   const positionAmount = qty * entry;
+  if (qty < 1) {
+    calcResult.textContent = "리스크 기준으로 계산된 수량이 1 미만입니다. 리스크 또는 손절폭을 조정해주세요.";
+    return;
+  }
+
   const lossWidthPercent = entry ? (perUnitRisk / entry) * 100 : 0;
   const targetPrice = getTargetPrice(entry, stop, targetR);
   const expectedProfit = riskAmount * targetR;
@@ -343,6 +371,7 @@ calcForm.addEventListener('submit', (e) => {
     lossWidthPercent,
     riskAmount,
     qty,
+    qtyRaw,
     positionAmount,
   };
 
@@ -351,7 +380,7 @@ calcForm.addEventListener('submit', (e) => {
     적용 리스크: <strong>${appliedRiskPercent.toFixed(2)}%</strong><br>
     손실폭(가격차): <strong>${perUnitRisk.toFixed(2)}</strong> (${lossWidthPercent.toFixed(2)}%)<br>
     최대 손실금액: <strong>${formatKRW(riskAmount.toFixed(0))}</strong><br>
-    추천 수량: <strong>${qty.toFixed(4)}</strong> <span class="muted">(금액: ${formatKRW(positionAmount.toFixed(0))})</span><br>
+    추천 수량: <strong>${qty}</strong> <span class="muted">(금액: ${formatKRW(positionAmount.toFixed(0))})</span><br>
     도달가(${targetR}R): <strong>${targetPrice.toFixed(2)}</strong><br>
     기대 수익: <strong>${formatKRW(expectedProfit.toFixed(0))}</strong>
   `;
@@ -377,10 +406,13 @@ addPositionBtn.addEventListener('click', () => {
   }
 
   const rows = loadPositions();
+  const entryDate = toDateString(new Date());
   rows.unshift({
     createdAt: new Date().toLocaleString('ko-KR'),
+    entryDate,
+    sellDate: addDays(entryDate, 5),
     symbol: lastCalc.symbol || '-',
-    qty: lastCalc.qty,
+    qty: Math.floor(lastCalc.qty),
     entry: lastCalc.entry,
     stop: lastCalc.stop,
     riskAmount: lastCalc.riskAmount,
@@ -391,13 +423,76 @@ addPositionBtn.addEventListener('click', () => {
 });
 
 positionsBody.addEventListener('click', (e) => {
-  const btn = e.target.closest('[data-pos-remove]');
-  if (!btn) return;
-  const idx = Number(btn.dataset.posRemove);
+  const closeBtn = e.target.closest('[data-pos-close]');
+  if (closeBtn) {
+    activeCloseIndex = Number(closeBtn.dataset.posClose);
+    const rows = loadPositions();
+    const row = rows[activeCloseIndex];
+    if (!row) return;
+    closeDialogInfo.textContent = `${row.symbol} · 보유수량 ${Math.floor(row.qty)} · 진입가 ${row.entry.toFixed(2)}`;
+    closeExitPriceEl.value = '';
+    closeDialog.showModal();
+    return;
+  }
+
+  const delBtn = e.target.closest('[data-pos-remove]');
+  if (!delBtn) return;
+  const idx = Number(delBtn.dataset.posRemove);
   const rows = loadPositions();
   rows.splice(idx, 1);
   savePositions(rows);
   renderPositions();
+});
+
+
+closeDialogCloseBtn.addEventListener('click', () => closeDialog.close());
+
+closeRatioButtons.forEach((btn) => {
+  btn.addEventListener('click', () => {
+    if (activeCloseIndex === null) return;
+    const ratio = Number(btn.dataset.closeRatio);
+    const exitPrice = Number(closeExitPriceEl.value);
+    if (!exitPrice || exitPrice <= 0) {
+      alert('청산가를 입력해주세요.');
+      return;
+    }
+
+    const positions = loadPositions();
+    const pos = positions[activeCloseIndex];
+    if (!pos) return;
+
+    const closeQty = ratio === 1 ? Math.floor(pos.qty) : Math.max(1, Math.floor(pos.qty * ratio));
+    const safeCloseQty = Math.min(Math.floor(pos.qty), closeQty);
+
+    const journal = loadRows();
+    const item = {
+      date: toDateString(new Date()),
+      symbol: pos.symbol,
+      entry: pos.entry,
+      stop: pos.stop,
+      exit: exitPrice,
+      qty: safeCloseQty,
+      fee: 0,
+      tag: `포지션청산 ${Math.round(ratio * 100)}%`,
+      note: '포지션 메뉴에서 청산 처리',
+    };
+    item.pnl = calcPnl(item);
+    item.rMultiple = calcRMultiple(item.entry, item.stop, item.exit);
+    journal.unshift(item);
+    saveRows(journal);
+
+    pos.qty = Math.floor(pos.qty) - safeCloseQty;
+    if (pos.qty <= 0) {
+      positions.splice(activeCloseIndex, 1);
+    } else {
+      positions[activeCloseIndex] = pos;
+    }
+    savePositions(positions);
+
+    closeDialog.close();
+    activeCloseIndex = null;
+    syncAllViews();
+  });
 });
 
 clearPositionsBtn.addEventListener('click', () => {
@@ -414,7 +509,7 @@ journalForm.addEventListener('submit', (e) => {
     entry: Number(document.getElementById('jEntry').value),
     stop: Number(document.getElementById('jStop').value),
     exit: Number(document.getElementById('jExit').value),
-    qty: Number(document.getElementById('jQty').value),
+    qty: Math.floor(Number(document.getElementById('jQty').value)),
     fee: Number(document.getElementById('jFee').value || 0),
     tag: document.getElementById('jTag').value.trim(),
     note: document.getElementById('jNote').value.trim(),

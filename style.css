@@ -128,6 +128,15 @@ th, td {
 .pnl-negative { color: var(--bad); font-weight: 600; }
 .small-btn { padding: 6px 8px; font-size: 0.8rem; }
 
+.positions-table {
+  table-layout: auto;
+}
+.positions-table th,
+.positions-table td {
+  white-space: nowrap;
+  word-break: normal;
+}
+
 .range-dialog {
   width: min(760px, calc(100vw - 20px));
   border: 1px solid var(--line);
