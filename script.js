@@ -34,11 +34,9 @@ const dTotal = document.getElementById('dTotal');
 const dWin = document.getElementById('dWin');
 const dPnlR = document.getElementById('dPnlR');
 const dAvgR = document.getElementById('dAvgR');
-const greenRiskView = document.getElementById('greenRiskView');
-const yellowRiskView = document.getElementById('yellowRiskView');
-const redRiskView = document.getElementById('redRiskView');
 const dayRiskView = document.getElementById('dayRiskView');
 const weekRiskView = document.getElementById('weekRiskView');
+const torValue = document.getElementById('torValue');
 const stepCumR = document.getElementById('stepCumR');
 const stepLevel = document.getElementById('stepLevel');
 const nextRiskScale = document.getElementById('nextRiskScale');
@@ -101,11 +99,6 @@ function getModeDefaultRisk(mode) {
   return mode === 'WEEK' ? Number(settings.weekRisk) : Number(settings.dayRisk);
 }
 
-function getSignalDefaultRisk(signal) {
-  const settings = loadSettings();
-  return Number(settings.signalRisk[signal] || settings.signalRisk.green);
-}
-
 function getStepLevel(cumulativeR) {
   if (cumulativeR >= 0) return Math.floor(cumulativeR / 10);
   return Math.ceil(cumulativeR / 10);
@@ -121,9 +114,7 @@ function getCumulativeR() {
 }
 
 function applyRiskPreset() {
-  if (riskModeEl.value === 'signal') {
-    riskEl.value = String(getSignalDefaultRisk(signalEl.value));
-  } else if (riskModeEl.value === 'mode') {
+  if (riskModeEl.value === 'mode') {
     riskEl.value = String(getModeDefaultRisk(modeEl.value));
   }
 }
@@ -161,11 +152,10 @@ function fillSettingsForm() {
 
 function syncDashboardConfigView() {
   const settings = loadSettings();
-  greenRiskView.textContent = `${settings.signalRisk.green.toFixed(1)}%`;
-  yellowRiskView.textContent = `${settings.signalRisk.yellow.toFixed(1)}%`;
-  redRiskView.textContent = `${settings.signalRisk.red.toFixed(1)}%`;
   dayRiskView.textContent = `${Number(settings.dayRisk).toFixed(1)}%`;
   weekRiskView.textContent = `${Number(settings.weekRisk).toFixed(1)}%`;
+  const totalOpenRisk = loadPositions().reduce((sum, row) => sum + Number(row.riskAmount || 0), 0);
+  torValue.textContent = formatKRW(totalOpenRisk.toFixed(0));
 }
 
 function calcRMultiple(entry, stop, exit) {
@@ -307,10 +297,7 @@ modeEl.addEventListener('change', () => {
   updateRiskPreview();
 });
 
-signalEl.addEventListener('change', () => {
-  applyRiskPreset();
-  updateRiskPreview();
-});
+signalEl.addEventListener('change', updateRiskPreview);
 
 riskModeEl.addEventListener('change', () => {
   applyRiskPreset();

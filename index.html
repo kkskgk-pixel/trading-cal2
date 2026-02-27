@@ -45,6 +45,10 @@
             <h3>모드 기본 리스크</h3>
             <p>DAY <span id="dayRiskView">1.0%</span> / WEEK <span id="weekRiskView">2.5%</span></p>
           </article>
+          <article class="card-mini">
+            <h3>TOR (Total Open Risk)</h3>
+            <p><span id="torValue">0원</span></p>
+          </article>
         </div>
 
         <div class="card-mini" style="margin-top:10px;">
@@ -79,7 +83,6 @@
           </label>
           <label>리스크 기준
             <select id="riskMode">
-              <option value="signal">신호등 기본 리스크 사용</option>
               <option value="mode">모드 기본 리스크 사용</option>
               <option value="manual">수동 입력 사용</option>
             </select>
