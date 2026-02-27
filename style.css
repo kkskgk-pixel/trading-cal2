@@ -96,6 +96,7 @@ input, select, textarea, button {
   background: #0f1733;
   color: var(--text);
   padding: 11px 12px;
+  font-size: 16px;
 }
 .full { grid-column: 1 / -1; }
 .btn-primary {
@@ -114,9 +115,15 @@ input, select, textarea, button {
   color: var(--muted);
   line-height: 1.6;
 }
-.table-wrap { overflow: auto; margin-top: 10px; }
-table { width: 100%; min-width: 760px; border-collapse: collapse; }
-th, td { border-bottom: 1px solid var(--line); text-align: left; padding: 10px 6px; vertical-align: top; }
+.table-wrap { overflow-x: auto; margin-top: 10px; -webkit-overflow-scrolling: touch; }
+table { width: 100%; border-collapse: collapse; table-layout: fixed; }
+th, td {
+  border-bottom: 1px solid var(--line);
+  text-align: left;
+  padding: 10px 6px;
+  vertical-align: top;
+  word-break: break-word;
+}
 .pnl-positive { color: var(--good); font-weight: 600; }
 .pnl-negative { color: var(--bad); font-weight: 600; }
 .small-btn { padding: 6px 8px; font-size: 0.8rem; }
@@ -142,5 +149,4 @@ th, td { border-bottom: 1px solid var(--line); text-align: left; padding: 10px 6
   .grid-form { grid-template-columns: 1fr; }
   .stats-grid { grid-template-columns: 1fr; }
   .section-head { flex-direction: column; align-items: flex-start; }
-  table { min-width: 640px; }
 }

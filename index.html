@@ -13,7 +13,6 @@
   <main class="app">
     <aside class="sidebar card-glass">
       <h1>추세추종</h1>
-      <p class="muted">대시보드 · 계산기 · 저널 · 포지션 · 설정</p>
       <nav class="menu" aria-label="메뉴">
         <button class="menu-btn active" data-view="dashboard">📊 대시보드</button>
         <button class="menu-btn" data-view="calculator">🧮 계산기</button>
@@ -29,7 +28,6 @@
           <h2>트레이딩 대시보드</h2>
           <span class="badge" id="dashModeBadge">DAY 모드</span>
         </div>
-        <p class="muted">성과와 리스크 정책을 빠르게 확인하세요.</p>
 
         <div class="stats-grid">
           <article><h3>총 거래</h3><p id="dTotal">0</p></article>
@@ -40,11 +38,11 @@
 
         <div class="inline-cards">
           <article class="card-mini">
-            <h3>시장 신호등 TOR</h3>
-            <p>🟢 <span id="torGreenView">1.2</span> · 🟡 <span id="torYellowView">1.0</span> · 🔴 <span id="torRedView">0.7</span></p>
+            <h3>신호등 기본 리스크(%)</h3>
+            <p>🟢 <span id="greenRiskView">5.0%</span> · 🟡 <span id="yellowRiskView">3.0%</span> · 🔴 <span id="redRiskView">1.0%</span></p>
           </article>
           <article class="card-mini">
-            <h3>기본 리스크</h3>
+            <h3>모드 기본 리스크</h3>
             <p>DAY <span id="dayRiskView">1.0%</span> / WEEK <span id="weekRiskView">2.5%</span></p>
           </article>
         </div>
@@ -79,11 +77,18 @@
               <option value="red">🔴 Red</option>
             </select>
           </label>
+          <label>리스크 기준
+            <select id="riskMode">
+              <option value="signal">신호등 기본 리스크 사용</option>
+              <option value="mode">모드 기본 리스크 사용</option>
+              <option value="manual">수동 입력 사용</option>
+            </select>
+          </label>
           <label>계좌 자본(원)
             <input type="number" id="capital" min="0" step="1000" placeholder="10000000" required />
           </label>
           <label>리스크(%)
-            <input type="number" id="riskPercent" min="0" step="0.1" value="1" required />
+            <input type="number" id="riskPercent" min="0" step="0.1" value="5" required />
           </label>
           <label>진입가
             <input type="number" id="entry" min="0" step="0.01" placeholder="50000" required />
@@ -136,7 +141,6 @@
           <h2>내 포지션 관리</h2>
           <button id="clear-positions" class="btn-ghost" type="button">포지션 전체 삭제</button>
         </div>
-        <p class="muted">계산기에서 추가한 포지션을 추적하고 관리하세요.</p>
         <div class="table-wrap">
           <table>
             <thead><tr><th>시간</th><th>티커</th><th>방향</th><th>수량</th><th>진입/손절</th><th>리스크금액</th><th></th></tr></thead>
@@ -147,7 +151,7 @@
 
       <section id="settings" class="view card-glass">
         <h2>설정</h2>
-        <p class="muted">기본 리스크와 TOR, 강조색 등을 변경할 수 있습니다.</p>
+        <p class="muted">기본 리스크 / 데이터 백업·복원을 설정할 수 있습니다.</p>
 
         <form id="settings-form" class="grid-form">
           <label>DAY 기본 리스크(%)
@@ -156,20 +160,23 @@
           <label>WEEK 기본 리스크(%)
             <input type="number" id="setWeekRisk" min="0" step="0.1" value="2.5" />
           </label>
-          <label>TOR Green
-            <input type="number" id="setTorGreen" min="0" step="0.1" value="1.2" />
+          <label>Green 기본 리스크(%)
+            <input type="number" id="setGreenRisk" min="0" step="0.1" value="5" />
           </label>
-          <label>TOR Yellow
-            <input type="number" id="setTorYellow" min="0" step="0.1" value="1.0" />
+          <label>Yellow 기본 리스크(%)
+            <input type="number" id="setYellowRisk" min="0" step="0.1" value="3" />
           </label>
-          <label>TOR Red
-            <input type="number" id="setTorRed" min="0" step="0.1" value="0.7" />
+          <label>Red 기본 리스크(%)
+            <input type="number" id="setRedRisk" min="0" step="0.1" value="1" />
           </label>
           <label>강조색
             <input type="color" id="setAccent" value="#7c8bff" />
           </label>
           <button class="btn-primary" type="submit">설정 저장</button>
           <button id="reset-settings" class="btn-ghost" type="button">기본값 복원</button>
+          <button id="export-data" class="btn-ghost" type="button">데이터 내보내기</button>
+          <button id="import-data" class="btn-ghost" type="button">데이터 불러오기</button>
+          <input id="import-file" type="file" accept="application/json" hidden />
         </form>
         <p id="settings-status" class="muted"></p>
       </section>

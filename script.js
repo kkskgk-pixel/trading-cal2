@@ -1,11 +1,11 @@
-const JOURNAL_KEY = 'trade_journal_v4';
-const SETTINGS_KEY = 'trade_settings_v2';
-const POSITIONS_KEY = 'trade_positions_v1';
+const JOURNAL_KEY = 'trade_journal_v5';
+const SETTINGS_KEY = 'trade_settings_v3';
+const POSITIONS_KEY = 'trade_positions_v2';
 
 const defaultSettings = {
   dayRisk: 1.0,
   weekRisk: 2.5,
-  tor: { green: 1.2, yellow: 1.0, red: 0.7 },
+  signalRisk: { green: 5.0, yellow: 3.0, red: 1.0 },
   accent: '#7c8bff',
 };
 
@@ -16,6 +16,7 @@ const views = [...document.querySelectorAll('.view')];
 
 const modeEl = document.getElementById('mode');
 const signalEl = document.getElementById('signal');
+const riskModeEl = document.getElementById('riskMode');
 const riskEl = document.getElementById('riskPercent');
 const calcForm = document.getElementById('calc-form');
 const calcResult = document.getElementById('calc-result');
@@ -34,9 +35,9 @@ const dTotal = document.getElementById('dTotal');
 const dWin = document.getElementById('dWin');
 const dPnl = document.getElementById('dPnl');
 const dAvg = document.getElementById('dAvg');
-const torGreenView = document.getElementById('torGreenView');
-const torYellowView = document.getElementById('torYellowView');
-const torRedView = document.getElementById('torRedView');
+const greenRiskView = document.getElementById('greenRiskView');
+const yellowRiskView = document.getElementById('yellowRiskView');
+const redRiskView = document.getElementById('redRiskView');
 const dayRiskView = document.getElementById('dayRiskView');
 const weekRiskView = document.getElementById('weekRiskView');
 
@@ -50,11 +51,14 @@ const clearPositionsBtn = document.getElementById('clear-positions');
 const settingsForm = document.getElementById('settings-form');
 const setDayRisk = document.getElementById('setDayRisk');
 const setWeekRisk = document.getElementById('setWeekRisk');
-const setTorGreen = document.getElementById('setTorGreen');
-const setTorYellow = document.getElementById('setTorYellow');
-const setTorRed = document.getElementById('setTorRed');
+const setGreenRisk = document.getElementById('setGreenRisk');
+const setYellowRisk = document.getElementById('setYellowRisk');
+const setRedRisk = document.getElementById('setRedRisk');
 const setAccent = document.getElementById('setAccent');
 const resetSettingsBtn = document.getElementById('reset-settings');
+const exportDataBtn = document.getElementById('export-data');
+const importDataBtn = document.getElementById('import-data');
+const importFileEl = document.getElementById('import-file');
 const settingsStatus = document.getElementById('settings-status');
 
 function formatKRW(n) {
@@ -66,7 +70,7 @@ function loadSettings() {
   return {
     ...defaultSettings,
     ...saved,
-    tor: { ...defaultSettings.tor, ...(saved.tor || {}) },
+    signalRisk: { ...defaultSettings.signalRisk, ...(saved.signalRisk || {}) },
   };
 }
 
@@ -95,8 +99,17 @@ function getModeDefaultRisk(mode) {
   return mode === 'WEEK' ? Number(settings.weekRisk) : Number(settings.dayRisk);
 }
 
-function applyModeDefaultRisk() {
-  riskEl.value = String(getModeDefaultRisk(modeEl.value));
+function getSignalDefaultRisk(signal) {
+  const settings = loadSettings();
+  return Number(settings.signalRisk[signal] || settings.signalRisk.green);
+}
+
+function applyRiskPreset() {
+  if (riskModeEl.value === 'signal') {
+    riskEl.value = String(getSignalDefaultRisk(signalEl.value));
+  } else if (riskModeEl.value === 'mode') {
+    riskEl.value = String(getModeDefaultRisk(modeEl.value));
+  }
 }
 
 function getAppliedRiskPercent() {
@@ -118,17 +131,17 @@ function fillSettingsForm() {
   const settings = loadSettings();
   setDayRisk.value = settings.dayRisk;
   setWeekRisk.value = settings.weekRisk;
-  setTorGreen.value = settings.tor.green;
-  setTorYellow.value = settings.tor.yellow;
-  setTorRed.value = settings.tor.red;
+  setGreenRisk.value = settings.signalRisk.green;
+  setYellowRisk.value = settings.signalRisk.yellow;
+  setRedRisk.value = settings.signalRisk.red;
   setAccent.value = settings.accent;
 }
 
 function syncDashboardConfigView() {
   const settings = loadSettings();
-  torGreenView.textContent = settings.tor.green.toFixed(1);
-  torYellowView.textContent = settings.tor.yellow.toFixed(1);
-  torRedView.textContent = settings.tor.red.toFixed(1);
+  greenRiskView.textContent = `${settings.signalRisk.green.toFixed(1)}%`;
+  yellowRiskView.textContent = `${settings.signalRisk.yellow.toFixed(1)}%`;
+  redRiskView.textContent = `${settings.signalRisk.red.toFixed(1)}%`;
   dayRiskView.textContent = `${Number(settings.dayRisk).toFixed(1)}%`;
   weekRiskView.textContent = `${Number(settings.weekRisk).toFixed(1)}%`;
 }
@@ -213,6 +226,40 @@ function renderRangePopup(calc) {
   }
 }
 
+function exportAllData() {
+  const data = {
+    version: 1,
+    exportedAt: new Date().toISOString(),
+    settings: loadSettings(),
+    journal: loadRows(),
+    positions: loadPositions(),
+  };
+
+  const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = `chuse-trend-backup-${new Date().toISOString().slice(0, 10)}.json`;
+  document.body.appendChild(a);
+  a.click();
+  a.remove();
+  URL.revokeObjectURL(url);
+}
+
+function importAllData(payload) {
+  if (payload.settings) localStorage.setItem(SETTINGS_KEY, JSON.stringify(payload.settings));
+  if (payload.journal) localStorage.setItem(JOURNAL_KEY, JSON.stringify(payload.journal));
+  if (payload.positions) localStorage.setItem(POSITIONS_KEY, JSON.stringify(payload.positions));
+
+  fillSettingsForm();
+  applyThemeFromSettings();
+  syncDashboardConfigView();
+  applyRiskPreset();
+  updateRiskPreview();
+  renderRows();
+  renderPositions();
+}
+
 menuButtons.forEach((btn) => {
   btn.addEventListener('click', () => {
     const target = btn.dataset.view;
@@ -222,7 +269,17 @@ menuButtons.forEach((btn) => {
 });
 
 modeEl.addEventListener('change', () => {
-  applyModeDefaultRisk();
+  applyRiskPreset();
+  updateRiskPreview();
+});
+
+signalEl.addEventListener('change', () => {
+  applyRiskPreset();
+  updateRiskPreview();
+});
+
+riskModeEl.addEventListener('change', () => {
+  applyRiskPreset();
   updateRiskPreview();
 });
 
@@ -231,17 +288,13 @@ riskEl.addEventListener('input', updateRiskPreview);
 calcForm.addEventListener('submit', (e) => {
   e.preventDefault();
 
-  const settings = loadSettings();
   const capital = Number(document.getElementById('capital').value);
   const entry = Number(document.getElementById('entry').value);
   const stop = Number(document.getElementById('stop').value);
   const targetR = Number(document.getElementById('targetR').value || 2);
 
-  const signal = signalEl.value;
-  const tor = Number(settings.tor[signal] || 1);
   const riskPercent = getAppliedRiskPercent();
-  const baseRiskAmount = capital * (riskPercent / 100);
-  const adjustedRiskAmount = baseRiskAmount * tor;
+  const riskAmount = capital * (riskPercent / 100);
   const perUnitRisk = Math.abs(entry - stop);
 
   if (perUnitRisk <= 0) {
@@ -249,33 +302,32 @@ calcForm.addEventListener('submit', (e) => {
     return;
   }
 
-  const qty = adjustedRiskAmount / perUnitRisk;
+  const qty = riskAmount / perUnitRisk;
   const lossWidthPercent = entry ? (perUnitRisk / entry) * 100 : 0;
   const targetPrice = getTargetPrice(entry, stop, targetR);
-  const expectedProfit = adjustedRiskAmount * targetR;
+  const expectedProfit = riskAmount * targetR;
 
   lastCalc = {
     symbol: calcSymbolEl.value.trim().toUpperCase(),
     side: calcSideEl.value,
     mode: modeEl.value,
-    signal,
+    signal: signalEl.value,
     riskPercent,
-    tor,
     capital,
     entry,
     stop,
     targetR,
     perUnitRisk,
     lossWidthPercent,
-    adjustedRiskAmount,
+    adjustedRiskAmount: riskAmount,
     qty,
   };
 
   calcResult.innerHTML = `
-    모드: <strong>${modeEl.value}</strong><br>
-    적용 리스크: <strong>${riskPercent.toFixed(2)}%</strong> · TOR <strong>${tor}</strong><br>
+    모드: <strong>${modeEl.value}</strong> · 신호등: <strong>${signalEl.value.toUpperCase()}</strong><br>
+    적용 리스크: <strong>${riskPercent.toFixed(2)}%</strong><br>
     손실폭(가격차): <strong>${perUnitRisk.toFixed(2)}</strong> (${lossWidthPercent.toFixed(2)}%)<br>
-    최대 손실금액(TOR 적용): <strong>${formatKRW(adjustedRiskAmount.toFixed(0))}</strong><br>
+    최대 손실금액: <strong>${formatKRW(riskAmount.toFixed(0))}</strong><br>
     추천 수량: <strong>${qty.toFixed(4)}</strong><br>
     목표가(${targetR}R): <strong>${targetPrice.toFixed(2)}</strong><br>
     기대 수익: <strong>${formatKRW(expectedProfit.toFixed(0))}</strong>
@@ -375,10 +427,10 @@ settingsForm.addEventListener('submit', (e) => {
   const next = {
     dayRisk: Number(setDayRisk.value || defaultSettings.dayRisk),
     weekRisk: Number(setWeekRisk.value || defaultSettings.weekRisk),
-    tor: {
-      green: Number(setTorGreen.value || defaultSettings.tor.green),
-      yellow: Number(setTorYellow.value || defaultSettings.tor.yellow),
-      red: Number(setTorRed.value || defaultSettings.tor.red),
+    signalRisk: {
+      green: Number(setGreenRisk.value || defaultSettings.signalRisk.green),
+      yellow: Number(setYellowRisk.value || defaultSettings.signalRisk.yellow),
+      red: Number(setRedRisk.value || defaultSettings.signalRisk.red),
     },
     accent: setAccent.value || defaultSettings.accent,
   };
@@ -386,7 +438,7 @@ settingsForm.addEventListener('submit', (e) => {
   saveSettings(next);
   applyThemeFromSettings();
   syncDashboardConfigView();
-  applyModeDefaultRisk();
+  applyRiskPreset();
   updateRiskPreview();
   settingsStatus.textContent = '설정이 저장되었습니다.';
 });
@@ -396,9 +448,32 @@ resetSettingsBtn.addEventListener('click', () => {
   fillSettingsForm();
   applyThemeFromSettings();
   syncDashboardConfigView();
-  applyModeDefaultRisk();
+  applyRiskPreset();
   updateRiskPreview();
   settingsStatus.textContent = '기본값으로 복원되었습니다.';
+});
+
+exportDataBtn.addEventListener('click', () => {
+  exportAllData();
+  settingsStatus.textContent = '데이터를 내보냈습니다.';
+});
+
+importDataBtn.addEventListener('click', () => importFileEl.click());
+
+importFileEl.addEventListener('change', async () => {
+  const file = importFileEl.files?.[0];
+  if (!file) return;
+
+  try {
+    const text = await file.text();
+    const parsed = JSON.parse(text);
+    importAllData(parsed);
+    settingsStatus.textContent = '데이터를 불러왔습니다.';
+  } catch {
+    settingsStatus.textContent = '불러오기 실패: JSON 파일을 확인해주세요.';
+  } finally {
+    importFileEl.value = '';
+  }
 });
 
 function init() {
@@ -406,7 +481,7 @@ function init() {
   fillSettingsForm();
   applyThemeFromSettings();
   syncDashboardConfigView();
-  applyModeDefaultRisk();
+  applyRiskPreset();
   updateRiskPreview();
   renderRows();
   renderPositions();
