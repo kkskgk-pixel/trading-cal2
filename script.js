@@ -1,12 +1,15 @@
-const JOURNAL_KEY = 'trade_journal_v3';
-const SETTINGS_KEY = 'trade_settings_v1';
+const JOURNAL_KEY = 'trade_journal_v4';
+const SETTINGS_KEY = 'trade_settings_v2';
+const POSITIONS_KEY = 'trade_positions_v1';
 
 const defaultSettings = {
-  baseRisk: 1.0,
-  weekBoost: 0.5,
+  dayRisk: 1.0,
+  weekRisk: 2.5,
   tor: { green: 1.2, yellow: 1.0, red: 0.7 },
   accent: '#7c8bff',
 };
+
+let lastCalc = null;
 
 const menuButtons = [...document.querySelectorAll('.menu-btn')];
 const views = [...document.querySelectorAll('.view')];
@@ -18,6 +21,14 @@ const calcForm = document.getElementById('calc-form');
 const calcResult = document.getElementById('calc-result');
 const appliedRiskBadge = document.getElementById('appliedRiskBadge');
 const dashModeBadge = document.getElementById('dashModeBadge');
+const addPositionBtn = document.getElementById('add-position');
+const openRangeBtn = document.getElementById('open-range');
+const rangeDialog = document.getElementById('range-dialog');
+const closeRangeBtn = document.getElementById('close-range');
+const rangeBody = document.getElementById('range-body');
+
+const calcSymbolEl = document.getElementById('calcSymbol');
+const calcSideEl = document.getElementById('calcSide');
 
 const dTotal = document.getElementById('dTotal');
 const dWin = document.getElementById('dWin');
@@ -26,16 +37,19 @@ const dAvg = document.getElementById('dAvg');
 const torGreenView = document.getElementById('torGreenView');
 const torYellowView = document.getElementById('torYellowView');
 const torRedView = document.getElementById('torRedView');
-const baseRiskView = document.getElementById('baseRiskView');
-const weekBoostView = document.getElementById('weekBoostView');
+const dayRiskView = document.getElementById('dayRiskView');
+const weekRiskView = document.getElementById('weekRiskView');
 
 const journalForm = document.getElementById('journal-form');
 const journalBody = document.getElementById('journal-body');
 const clearAllBtn = document.getElementById('clear-all');
 
+const positionsBody = document.getElementById('positions-body');
+const clearPositionsBtn = document.getElementById('clear-positions');
+
 const settingsForm = document.getElementById('settings-form');
-const setBaseRisk = document.getElementById('setBaseRisk');
-const setWeekBoost = document.getElementById('setWeekBoost');
+const setDayRisk = document.getElementById('setDayRisk');
+const setWeekRisk = document.getElementById('setWeekRisk');
 const setTorGreen = document.getElementById('setTorGreen');
 const setTorYellow = document.getElementById('setTorYellow');
 const setTorRed = document.getElementById('setTorRed');
@@ -68,11 +82,25 @@ function saveRows(rows) {
   localStorage.setItem(JOURNAL_KEY, JSON.stringify(rows));
 }
 
-function getAppliedRiskPercent() {
+function loadPositions() {
+  return JSON.parse(localStorage.getItem(POSITIONS_KEY) || '[]');
+}
+
+function savePositions(rows) {
+  localStorage.setItem(POSITIONS_KEY, JSON.stringify(rows));
+}
+
+function getModeDefaultRisk(mode) {
   const settings = loadSettings();
-  const rawRisk = Number(riskEl.value || settings.baseRisk);
-  const modeBoost = modeEl.value === 'WEEK' ? settings.weekBoost : 0;
-  return rawRisk + modeBoost;
+  return mode === 'WEEK' ? Number(settings.weekRisk) : Number(settings.dayRisk);
+}
+
+function applyModeDefaultRisk() {
+  riskEl.value = String(getModeDefaultRisk(modeEl.value));
+}
+
+function getAppliedRiskPercent() {
+  return Number(riskEl.value || 0);
 }
 
 function updateRiskPreview() {
@@ -88,8 +116,8 @@ function applyThemeFromSettings() {
 
 function fillSettingsForm() {
   const settings = loadSettings();
-  setBaseRisk.value = settings.baseRisk;
-  setWeekBoost.value = settings.weekBoost;
+  setDayRisk.value = settings.dayRisk;
+  setWeekRisk.value = settings.weekRisk;
   setTorGreen.value = settings.tor.green;
   setTorYellow.value = settings.tor.yellow;
   setTorRed.value = settings.tor.red;
@@ -101,8 +129,8 @@ function syncDashboardConfigView() {
   torGreenView.textContent = settings.tor.green.toFixed(1);
   torYellowView.textContent = settings.tor.yellow.toFixed(1);
   torRedView.textContent = settings.tor.red.toFixed(1);
-  baseRiskView.textContent = `${Number(settings.baseRisk).toFixed(1)}%`;
-  weekBoostView.textContent = `+${Number(settings.weekBoost).toFixed(1)}%`;
+  dayRiskView.textContent = `${Number(settings.dayRisk).toFixed(1)}%`;
+  weekRiskView.textContent = `${Number(settings.weekRisk).toFixed(1)}%`;
 }
 
 function renderStats(rows) {
@@ -141,9 +169,48 @@ function renderRows() {
   renderStats(rows);
 }
 
+function renderPositions() {
+  const rows = loadPositions();
+  positionsBody.innerHTML = '';
+
+  rows.forEach((row, idx) => {
+    const tr = document.createElement('tr');
+    tr.innerHTML = `
+      <td>${row.createdAt}</td>
+      <td>${row.symbol}</td>
+      <td>${row.side}</td>
+      <td>${row.qty.toFixed(4)}</td>
+      <td>${row.entry.toFixed(2)} / ${row.stop.toFixed(2)}</td>
+      <td>${formatKRW(row.riskAmount.toFixed(0))}</td>
+      <td><button class="small-btn btn-ghost" data-pos-remove="${idx}">삭제</button></td>
+    `;
+    positionsBody.appendChild(tr);
+  });
+}
+
 function calcPnl({ side, entry, exit, qty, fee }) {
   const diff = side === 'Long' ? exit - entry : entry - exit;
   return diff * qty - fee;
+}
+
+function getTargetPrice(entry, stop, r) {
+  const perUnitRisk = Math.abs(entry - stop);
+  return entry > stop ? entry + perUnitRisk * r : entry - perUnitRisk * r;
+}
+
+function renderRangePopup(calc) {
+  rangeBody.innerHTML = '';
+  for (let r = 1; r <= 10; r += 1) {
+    const targetPrice = getTargetPrice(calc.entry, calc.stop, r);
+    const expectedProfit = calc.adjustedRiskAmount * r;
+    const tr = document.createElement('tr');
+    tr.innerHTML = `
+      <td>${r}R</td>
+      <td>${targetPrice.toFixed(2)}</td>
+      <td>${formatKRW(expectedProfit.toFixed(0))}</td>
+    `;
+    rangeBody.appendChild(tr);
+  }
 }
 
 menuButtons.forEach((btn) => {
@@ -154,7 +221,11 @@ menuButtons.forEach((btn) => {
   });
 });
 
-modeEl.addEventListener('change', updateRiskPreview);
+modeEl.addEventListener('change', () => {
+  applyModeDefaultRisk();
+  updateRiskPreview();
+});
+
 riskEl.addEventListener('input', updateRiskPreview);
 
 calcForm.addEventListener('submit', (e) => {
@@ -168,9 +239,8 @@ calcForm.addEventListener('submit', (e) => {
 
   const signal = signalEl.value;
   const tor = Number(settings.tor[signal] || 1);
-
-  const appliedRiskPercent = getAppliedRiskPercent();
-  const baseRiskAmount = capital * (appliedRiskPercent / 100);
+  const riskPercent = getAppliedRiskPercent();
+  const baseRiskAmount = capital * (riskPercent / 100);
   const adjustedRiskAmount = baseRiskAmount * tor;
   const perUnitRisk = Math.abs(entry - stop);
 
@@ -180,20 +250,86 @@ calcForm.addEventListener('submit', (e) => {
   }
 
   const qty = adjustedRiskAmount / perUnitRisk;
-  const targetPrice = entry > stop ? entry + perUnitRisk * targetR : entry - perUnitRisk * targetR;
+  const lossWidthPercent = entry ? (perUnitRisk / entry) * 100 : 0;
+  const targetPrice = getTargetPrice(entry, stop, targetR);
   const expectedProfit = adjustedRiskAmount * targetR;
+
+  lastCalc = {
+    symbol: calcSymbolEl.value.trim().toUpperCase(),
+    side: calcSideEl.value,
+    mode: modeEl.value,
+    signal,
+    riskPercent,
+    tor,
+    capital,
+    entry,
+    stop,
+    targetR,
+    perUnitRisk,
+    lossWidthPercent,
+    adjustedRiskAmount,
+    qty,
+  };
 
   calcResult.innerHTML = `
     모드: <strong>${modeEl.value}</strong><br>
-    적용 리스크: <strong>${appliedRiskPercent.toFixed(2)}%</strong> (WEEK는 설정값만큼 자연 가산)<br>
-    시장 신호등: <strong>${signal.toUpperCase()}</strong> · TOR <strong>${tor}</strong><br>
-    TOR 적용 리스크 금액: <strong>${formatKRW(adjustedRiskAmount.toFixed(0))}</strong><br>
+    적용 리스크: <strong>${riskPercent.toFixed(2)}%</strong> · TOR <strong>${tor}</strong><br>
+    손실폭(가격차): <strong>${perUnitRisk.toFixed(2)}</strong> (${lossWidthPercent.toFixed(2)}%)<br>
+    최대 손실금액(TOR 적용): <strong>${formatKRW(adjustedRiskAmount.toFixed(0))}</strong><br>
     추천 수량: <strong>${qty.toFixed(4)}</strong><br>
     목표가(${targetR}R): <strong>${targetPrice.toFixed(2)}</strong><br>
     기대 수익: <strong>${formatKRW(expectedProfit.toFixed(0))}</strong>
   `;
 
   updateRiskPreview();
+});
+
+openRangeBtn.addEventListener('click', () => {
+  if (!lastCalc) {
+    alert('먼저 계산을 실행해주세요.');
+    return;
+  }
+  renderRangePopup(lastCalc);
+  rangeDialog.showModal();
+});
+
+closeRangeBtn.addEventListener('click', () => rangeDialog.close());
+
+addPositionBtn.addEventListener('click', () => {
+  if (!lastCalc) {
+    alert('먼저 계산을 실행해주세요.');
+    return;
+  }
+
+  const rows = loadPositions();
+  rows.unshift({
+    createdAt: new Date().toLocaleString('ko-KR'),
+    symbol: lastCalc.symbol || '-',
+    side: lastCalc.side,
+    qty: lastCalc.qty,
+    entry: lastCalc.entry,
+    stop: lastCalc.stop,
+    riskAmount: lastCalc.adjustedRiskAmount,
+  });
+  savePositions(rows);
+  renderPositions();
+  alert('포지션이 추가되었습니다.');
+});
+
+positionsBody.addEventListener('click', (e) => {
+  const btn = e.target.closest('[data-pos-remove]');
+  if (!btn) return;
+  const idx = Number(btn.dataset.posRemove);
+  const rows = loadPositions();
+  rows.splice(idx, 1);
+  savePositions(rows);
+  renderPositions();
+});
+
+clearPositionsBtn.addEventListener('click', () => {
+  if (!confirm('포지션 데이터를 모두 삭제할까요?')) return;
+  localStorage.removeItem(POSITIONS_KEY);
+  renderPositions();
 });
 
 journalForm.addEventListener('submit', (e) => {
@@ -237,8 +373,8 @@ clearAllBtn.addEventListener('click', () => {
 settingsForm.addEventListener('submit', (e) => {
   e.preventDefault();
   const next = {
-    baseRisk: Number(setBaseRisk.value || defaultSettings.baseRisk),
-    weekBoost: Number(setWeekBoost.value || defaultSettings.weekBoost),
+    dayRisk: Number(setDayRisk.value || defaultSettings.dayRisk),
+    weekRisk: Number(setWeekRisk.value || defaultSettings.weekRisk),
     tor: {
       green: Number(setTorGreen.value || defaultSettings.tor.green),
       yellow: Number(setTorYellow.value || defaultSettings.tor.yellow),
@@ -250,12 +386,9 @@ settingsForm.addEventListener('submit', (e) => {
   saveSettings(next);
   applyThemeFromSettings();
   syncDashboardConfigView();
+  applyModeDefaultRisk();
   updateRiskPreview();
   settingsStatus.textContent = '설정이 저장되었습니다.';
-
-  if (!riskEl.value || Number(riskEl.value) <= 0) {
-    riskEl.value = String(next.baseRisk);
-  }
 });
 
 resetSettingsBtn.addEventListener('click', () => {
@@ -263,7 +396,7 @@ resetSettingsBtn.addEventListener('click', () => {
   fillSettingsForm();
   applyThemeFromSettings();
   syncDashboardConfigView();
-  riskEl.value = String(defaultSettings.baseRisk);
+  applyModeDefaultRisk();
   updateRiskPreview();
   settingsStatus.textContent = '기본값으로 복원되었습니다.';
 });
@@ -273,9 +406,10 @@ function init() {
   fillSettingsForm();
   applyThemeFromSettings();
   syncDashboardConfigView();
-  riskEl.value = String(loadSettings().baseRisk);
+  applyModeDefaultRisk();
   updateRiskPreview();
   renderRows();
+  renderPositions();
 }
 
 init();

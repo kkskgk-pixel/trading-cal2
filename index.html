@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Trading Workspace Pro</title>
+  <title>추세추종</title>
   <link rel="stylesheet" href="style.css" />
 </head>
 <body>
@@ -12,12 +12,13 @@
 
   <main class="app">
     <aside class="sidebar card-glass">
-      <h1>Trading Pro</h1>
-      <p class="muted">한 화면에서 대시보드 · 계산기 · 저널 · 설정</p>
+      <h1>추세추종</h1>
+      <p class="muted">대시보드 · 계산기 · 저널 · 포지션 · 설정</p>
       <nav class="menu" aria-label="메뉴">
         <button class="menu-btn active" data-view="dashboard">📊 대시보드</button>
         <button class="menu-btn" data-view="calculator">🧮 계산기</button>
         <button class="menu-btn" data-view="journal">📒 저널</button>
+        <button class="menu-btn" data-view="positions">💼 포지션</button>
         <button class="menu-btn" data-view="settings">⚙️ 설정</button>
       </nav>
     </aside>
@@ -28,7 +29,7 @@
           <h2>트레이딩 대시보드</h2>
           <span class="badge" id="dashModeBadge">DAY 모드</span>
         </div>
-        <p class="muted">최근 저널 성과와 현재 리스크 환경을 빠르게 확인하세요.</p>
+        <p class="muted">성과와 리스크 정책을 빠르게 확인하세요.</p>
 
         <div class="stats-grid">
           <article><h3>총 거래</h3><p id="dTotal">0</p></article>
@@ -43,8 +44,8 @@
             <p>🟢 <span id="torGreenView">1.2</span> · 🟡 <span id="torYellowView">1.0</span> · 🔴 <span id="torRedView">0.7</span></p>
           </article>
           <article class="card-mini">
-            <h3>리스크 정책</h3>
-            <p>기본 <span id="baseRiskView">1.0%</span> / WEEK 가산 <span id="weekBoostView">+0.5%</span></p>
+            <h3>기본 리스크</h3>
+            <p>DAY <span id="dayRiskView">1.0%</span> / WEEK <span id="weekRiskView">2.5%</span></p>
           </article>
         </div>
       </section>
@@ -52,10 +53,19 @@
       <section id="calculator" class="view card-glass">
         <div class="section-head">
           <h2>포지션 사이징 계산기</h2>
-          <span class="badge" id="appliedRiskBadge">적용 리스크 0%</span>
+          <span class="badge" id="appliedRiskBadge">적용 리스크 1.00%</span>
         </div>
 
         <form id="calc-form" class="grid-form">
+          <label>티커
+            <input type="text" id="calcSymbol" placeholder="BTCUSDT" required />
+          </label>
+          <label>방향
+            <select id="calcSide">
+              <option value="Long">Long</option>
+              <option value="Short">Short</option>
+            </select>
+          </label>
           <label>모드
             <select id="mode">
               <option value="DAY">DAY</option>
@@ -82,9 +92,11 @@
             <input type="number" id="stop" min="0" step="0.01" placeholder="48500" required />
           </label>
           <label>목표 R배수
-            <input type="number" id="targetR" min="0" step="0.1" value="2" required />
+            <input type="number" id="targetR" min="1" max="10" step="0.1" value="2" required />
           </label>
           <button class="btn-primary" type="submit">계산하기</button>
+          <button id="open-range" class="btn-ghost" type="button">R 1~10 목표가 보기</button>
+          <button id="add-position" class="btn-primary" type="button">현재 계산값으로 포지션 추가</button>
         </form>
 
         <div id="calc-result" class="result">계산 결과가 여기에 표시됩니다.</div>
@@ -119,16 +131,30 @@
         </div>
       </section>
 
+      <section id="positions" class="view card-glass">
+        <div class="section-head">
+          <h2>내 포지션 관리</h2>
+          <button id="clear-positions" class="btn-ghost" type="button">포지션 전체 삭제</button>
+        </div>
+        <p class="muted">계산기에서 추가한 포지션을 추적하고 관리하세요.</p>
+        <div class="table-wrap">
+          <table>
+            <thead><tr><th>시간</th><th>티커</th><th>방향</th><th>수량</th><th>진입/손절</th><th>리스크금액</th><th></th></tr></thead>
+            <tbody id="positions-body"></tbody>
+          </table>
+        </div>
+      </section>
+
       <section id="settings" class="view card-glass">
         <h2>설정</h2>
-        <p class="muted">화면/리스크/신호등 값을 취향에 맞게 바꿀 수 있습니다.</p>
+        <p class="muted">기본 리스크와 TOR, 강조색 등을 변경할 수 있습니다.</p>
 
         <form id="settings-form" class="grid-form">
-          <label>기본 리스크(%)
-            <input type="number" id="setBaseRisk" min="0" step="0.1" value="1" />
+          <label>DAY 기본 리스크(%)
+            <input type="number" id="setDayRisk" min="0" step="0.1" value="1" />
           </label>
-          <label>WEEK 모드 리스크 가산(%)
-            <input type="number" id="setWeekBoost" min="0" step="0.1" value="0.5" />
+          <label>WEEK 기본 리스크(%)
+            <input type="number" id="setWeekRisk" min="0" step="0.1" value="2.5" />
           </label>
           <label>TOR Green
             <input type="number" id="setTorGreen" min="0" step="0.1" value="1.2" />
@@ -149,6 +175,19 @@
       </section>
     </section>
   </main>
+
+  <dialog id="range-dialog" class="range-dialog">
+    <div class="section-head">
+      <h3>목표가 범위 (R 1~10)</h3>
+      <button id="close-range" class="btn-ghost" type="button">닫기</button>
+    </div>
+    <div class="table-wrap">
+      <table>
+        <thead><tr><th>R 배수</th><th>목표가</th><th>기대수익(원)</th></tr></thead>
+        <tbody id="range-body"></tbody>
+      </table>
+    </div>
+  </dialog>
 
   <script src="script.js"></script>
 </body>

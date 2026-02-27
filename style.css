@@ -16,12 +16,7 @@ body {
   line-height: 1.6;
   background: radial-gradient(80% 80% at 0% 0%, #182446 0%, var(--bg) 55%);
 }
-.bg-orb {
-  position: fixed;
-  filter: blur(60px);
-  pointer-events: none;
-  z-index: 0;
-}
+.bg-orb { position: fixed; filter: blur(60px); pointer-events: none; z-index: 0; }
 .orb-1 { width: 260px; height: 260px; background: #4466ff70; top: -40px; right: 15%; }
 .orb-2 { width: 240px; height: 240px; background: #00d4ff52; bottom: -60px; left: 10%; }
 
@@ -126,6 +121,16 @@ th, td { border-bottom: 1px solid var(--line); text-align: left; padding: 10px 6
 .pnl-negative { color: var(--bad); font-weight: 600; }
 .small-btn { padding: 6px 8px; font-size: 0.8rem; }
 
+.range-dialog {
+  width: min(760px, calc(100vw - 20px));
+  border: 1px solid var(--line);
+  border-radius: 14px;
+  padding: 14px;
+  background: #111a37;
+  color: var(--text);
+}
+.range-dialog::backdrop { background: rgba(5, 10, 28, 0.65); }
+
 @media (max-width: 980px) {
   .app { max-width: 760px; }
   .inline-cards { grid-template-columns: 1fr; }
@@ -137,4 +142,5 @@ th, td { border-bottom: 1px solid var(--line); text-align: left; padding: 10px 6
   .grid-form { grid-template-columns: 1fr; }
   .stats-grid { grid-template-columns: 1fr; }
   .section-head { flex-direction: column; align-items: flex-start; }
+  table { min-width: 640px; }
 }
