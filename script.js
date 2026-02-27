@@ -322,7 +322,8 @@ riskEl.addEventListener('input', updateRiskPreview);
 calcForm.addEventListener('submit', (e) => {
   e.preventDefault();
 
-  const capital = Number(document.getElementById('capital').value);
+  const capitalMillion = Number(document.getElementById('capital').value);
+  const capital = capitalMillion * 1000000;
   const entry = Number(document.getElementById('entry').value);
   const stop = Number(document.getElementById('stop').value);
   const targetR = Number(document.getElementById('targetR').value || 2);
