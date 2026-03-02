@@ -223,7 +223,12 @@ function syncDashboardConfigView() {
   const settings = loadSettings();
   dayRiskView.textContent = `${Number(settings.dayRisk).toFixed(1)}%`;
   weekRiskView.textContent = `${Number(settings.weekRisk).toFixed(1)}%`;
-  const totalOpenRisk = loadPositions().reduce((sum, row) => sum + Number(row.riskAmount || 0), 0);
+  // TOR 계산: 포지션별로 |진입가 - 손절가| × 수량 합산
+  // riskAmount가 있으면 우선 사용, 없으면 직접 계산
+  const totalOpenRisk = loadPositions().reduce((sum, row) => {
+    const directRisk = Math.abs(Number(row.entry || 0) - Number(row.stop || 0)) * Number(row.qty || 0);
+    return sum + (directRisk > 0 ? directRisk : Number(row.riskAmount || 0));
+  }, 0);
   torValue.textContent = formatKRW(totalOpenRisk.toFixed(0));
 }
 
@@ -428,7 +433,7 @@ function renderPositions() {
       <td>${row.entryDate}</td>
       <td><input class="tbl-input tbl-date" type="date" value="${row.sellDate || ''}" data-field="sellDate" data-idx="${idx}" /></td>
       <td>${row.symbol}</td>
-      <td>${Math.floor(row.qty)}</td>
+      <td><input class="tbl-input tbl-num" type="number" min="1" step="1" value="${Math.floor(row.qty)}" data-field="qty" data-idx="${idx}" /></td>
       <td><input class="tbl-input tbl-num" type="number" value="${Math.round(row.entry)}" data-field="entry" data-idx="${idx}" /></td>
       <td><input class="tbl-input tbl-num" type="number" value="${Math.round(row.stop)}" data-field="stop" data-idx="${idx}" /></td>
       <td><span class="${modeCls}">${modeLabel}</span></td>
@@ -677,7 +682,7 @@ positionForm.addEventListener('submit', (e) => {
   showToast(`포지션 추가: ${symbol}`, 'success');
 });
 
-// --- 포지션 인라인 편집 자동저장 (매도일·진입가·손절가 변경 시) ---
+// --- 포지션 인라인 편집 자동저장 (매도일·진입가·손절가·수량 변경 시) ---
 positionsBody.addEventListener('change', (e) => {
   const input = e.target.closest('[data-field][data-idx]');
   if (!input) return;
@@ -689,8 +694,15 @@ positionsBody.addEventListener('change', (e) => {
     positions[idx].sellDate = input.value;
   } else if (field === 'entry' || field === 'stop') {
     positions[idx][field] = Math.round(Number(input.value));
+  } else if (field === 'qty') {
+    // 수량 수정: 최소 1 이상으로 저장
+    const newQty = Math.max(1, Math.floor(Number(input.value)));
+    positions[idx].qty = newQty;
+    input.value = newQty; // 입력창도 정수로 보정
   }
   savePositions(positions);
+  // 수량/진입가/손절가 변경 시 TOR 재계산
+  syncDashboardConfigView();
   showToast('포지션이 수정되었습니다.', 'success');
 });
 
