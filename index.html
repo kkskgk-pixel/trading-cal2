@@ -1,11 +1,15 @@
 <!doctype html>
 <html lang="ko">
+
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>추세추종</title>
   <link rel="stylesheet" href="style.css" />
+  <!-- Chart.js 라이브러리 추가 -->
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 </head>
+
 <body>
   <div class="bg-orb orb-1"></div>
   <div class="bg-orb orb-2"></div>
@@ -26,20 +30,32 @@
       <section id="dashboard" class="view active card-glass">
         <div class="section-head">
           <h2>트레이딩 대시보드</h2>
-          <span class="badge" id="dashModeBadge">DAY 모드</span>
+          <div class="mode-toggle">
+            <button class="mode-btn active" data-mode="DAY">DAY</button>
+            <button class="mode-btn" data-mode="WEEK">WEEK</button>
+          </div>
         </div>
 
-        <div class="stats-grid">
-          <article><h3>총 거래</h3><p id="dTotal">0</p></article>
-          <article><h3>승률</h3><p id="dWin">0%</p></article>
-          <article><h3>누적 수익(R)</h3><p id="dPnlR">0.00R</p></article>
-          <article><h3>평균 수익(R)</h3><p id="dAvgR">0.00R</p></article>
+        <div class="stats-grid stats-3">
+          <article>
+            <h3>총 거래</h3>
+            <p id="dTotal">0</p>
+          </article>
+          <article>
+            <h3>누적 수익(R)</h3>
+            <p id="dPnlR">0.00R</p>
+          </article>
+          <article>
+            <h3>평균 수익(R)</h3>
+            <p id="dAvgR">0.00R</p>
+          </article>
         </div>
 
         <div class="inline-cards">
           <article class="card-mini">
             <h3>신호등 기본 리스크(%)</h3>
-            <p>🟢 <span id="greenRiskView">5.0%</span> · 🟡 <span id="yellowRiskView">3.0%</span> · 🔴 <span id="redRiskView">1.0%</span></p>
+            <p>🟢 <span id="greenRiskView">5.0%</span> · 🟡 <span id="yellowRiskView">3.0%</span> · 🔴 <span
+                id="redRiskView">1.0%</span></p>
           </article>
           <article class="card-mini">
             <h3>모드 기본 리스크</h3>
@@ -53,8 +69,26 @@
 
         <div class="card-mini" style="margin-top:10px;">
           <h3>누적손익 스텝 기준 (+10R / -10R)</h3>
-          <p>현재 누적 <strong id="stepCumR">0.00R</strong> · 스텝 <strong id="stepLevel">0</strong> · 다음 트레이드 리스크 배율 <strong id="nextRiskScale">1.00x</strong></p>
+          <p>현재 누적 <strong id="stepCumR">0.00R</strong> · 스텝 <strong id="stepLevel">0</strong> · 다음 트레이드 리스크 배율 <strong
+              id="nextRiskScale">1.00x</strong></p>
           <p class="muted">규칙: +10R 도달마다 +10%, -10R 도달마다 -10% (스텝 기반 누적 적용)</p>
+        </div>
+
+        <!-- 시각화 차트 추가 -->
+        <div class="chart-container card-mini" style="margin-top:10px;">
+          <h3>누적 수익 추이 (R)</h3>
+          <canvas id="equityChart"></canvas>
+        </div>
+
+        <div class="stats-grid" style="margin-top:10px;">
+          <article class="card-mini">
+            <h3>전략별 최고 성과</h3>
+            <p id="bestTag">-</p>
+          </article>
+          <article class="card-mini">
+            <h3>최대 낙폭 (MDD)</h3>
+            <p id="mddValue">0.00R</p>
+          </article>
         </div>
       </section>
 
@@ -115,9 +149,40 @@
           <h2>내 포지션 관리</h2>
           <button id="clear-positions" class="btn-ghost" type="button">포지션 전체 삭제</button>
         </div>
+
+        <details class="pos-add-panel">
+          <summary>＋ 포지션 직접 추가</summary>
+          <form id="position-form" class="grid-form">
+            <label>티커<input type="text" id="pSymbol" placeholder="BTCUSDT" required /></label>
+            <label>진입날짜<input type="date" id="pEntryDate" required /></label>
+            <label>매도예정일<input type="date" id="pSellDate" /></label>
+            <label>수량<input type="number" id="pQty" min="1" step="1" placeholder="10" required /></label>
+            <label>진입가<input type="number" id="pEntry" min="0" step="1" placeholder="50000" required /></label>
+            <label>손절가<input type="number" id="pStop" min="0" step="1" placeholder="48000" required /></label>
+            <label>기준
+              <select id="pMode">
+                <option value="DAY">일봉기준</option>
+                <option value="WEEK">주봉기준</option>
+              </select>
+            </label>
+            <button class="btn-primary" type="submit">포지션 추가</button>
+          </form>
+        </details>
+
         <div class="table-wrap">
           <table class="positions-table">
-            <thead><tr><th>진입날짜</th><th>매도일(D+5)</th><th>종목</th><th>수량</th><th>진입가</th><th>손절가</th><th></th></tr></thead>
+            <thead>
+              <tr>
+                <th>진입날짜</th>
+                <th>매도일</th>
+                <th>종목</th>
+                <th>수량</th>
+                <th>진입가</th>
+                <th>손절가</th>
+                <th>기준</th>
+                <th></th>
+              </tr>
+            </thead>
             <tbody id="positions-body"></tbody>
           </table>
         </div>
@@ -144,7 +209,17 @@
 
         <div class="table-wrap">
           <table>
-            <thead><tr><th>날짜</th><th>티커</th><th>R</th><th>손익(원)</th><th>태그</th><th>메모</th><th></th></tr></thead>
+            <thead>
+              <tr>
+                <th>날짜</th>
+                <th>티커</th>
+                <th>R</th>
+                <th>손익(원)</th>
+                <th>태그</th>
+                <th>메모</th>
+                <th></th>
+              </tr>
+            </thead>
             <tbody id="journal-body"></tbody>
           </table>
         </div>
@@ -191,7 +266,13 @@
     </div>
     <div class="table-wrap">
       <table>
-        <thead><tr><th>R 배수</th><th>도달가</th><th>기대수익(원)</th></tr></thead>
+        <thead>
+          <tr>
+            <th>R 배수</th>
+            <th>도달가</th>
+            <th>기대수익(원)</th>
+          </tr>
+        </thead>
         <tbody id="range-body"></tbody>
       </table>
     </div>
@@ -213,6 +294,9 @@
     </div>
   </dialog>
 
+  <div id="toast-container" class="toast-container"></div>
+
   <script src="script.js"></script>
 </body>
+
 </html>
