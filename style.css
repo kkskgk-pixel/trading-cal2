@@ -273,6 +273,17 @@ button {
   cursor: pointer;
 }
 
+/* 계산기 내 포지션 추가 필드 영역 (티커 + 매도예정일) */
+.add-pos-fields {
+  grid-column: 1 / -1;
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 10px;
+  margin-top: 6px;
+  padding-top: 14px;
+  border-top: 1px dashed var(--line);
+}
+
 .result {
   margin-top: 12px;
   border: 1px dashed var(--line);
@@ -464,6 +475,10 @@ td {
   }
 
   .grid-form {
+    grid-template-columns: 1fr;
+  }
+
+  .add-pos-fields {
     grid-template-columns: 1fr;
   }
 

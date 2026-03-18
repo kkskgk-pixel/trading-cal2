@@ -99,28 +99,15 @@
         </div>
 
         <form id="calc-form" class="grid-form">
-          <label>티커
-            <input type="text" id="calcSymbol" placeholder="BTCUSDT" required />
-          </label>
           <label>모드
             <select id="mode">
               <option value="DAY">DAY</option>
               <option value="WEEK">WEEK</option>
             </select>
           </label>
-          <label>시장 신호등
-            <select id="signal">
-              <option value="green">🟢 Green</option>
-              <option value="yellow">🟡 Yellow</option>
-              <option value="red">🔴 Red</option>
-            </select>
-          </label>
-          <label>리스크 기준
-            <select id="riskMode">
-              <option value="mode">모드 기본 리스크 사용</option>
-              <option value="manual">수동 입력 사용</option>
-            </select>
-          </label>
+          <!-- 시장 신호등 / 리스크 기준은 제거됨, 모드 기본 리스크 자동 적용 -->
+          <select id="signal" hidden><option value="green" selected>🟢 Green</option></select>
+          <select id="riskMode" hidden><option value="mode" selected>모드 기본 리스크 사용</option></select>
           <label>계좌 자본(백만원)
             <input type="number" id="capital" min="0" step="0.1" placeholder="10" required />
           </label>
@@ -138,6 +125,16 @@
           </label>
           <button class="btn-primary" type="submit">계산하기</button>
           <button id="open-range" class="btn-ghost" type="button">1R~10R 도달가 보기</button>
+
+          <!-- 포지션 추가용 티커·매도예정일 입력 영역 -->
+          <div class="add-pos-fields">
+            <label>티커
+              <input type="text" id="calcSymbol" placeholder="BTCUSDT" />
+            </label>
+            <label>매도예정일
+              <input type="date" id="calcSellDate" />
+            </label>
+          </div>
           <button id="add-position" class="btn-primary" type="button">현재 계산값으로 포지션 추가</button>
         </form>
 

@@ -33,6 +33,7 @@ const rangeDialog = document.getElementById('range-dialog');
 const closeRangeBtn = document.getElementById('close-range');
 const rangeBody = document.getElementById('range-body');
 const calcSymbolEl = document.getElementById('calcSymbol');
+const calcSellDateEl = document.getElementById('calcSellDate');
 
 const dTotal = document.getElementById('dTotal');
 const dPnlR = document.getElementById('dPnlR');
@@ -543,11 +544,8 @@ modeEl.addEventListener('change', () => {
   applyRiskPreset();
   updateRiskPreview();
 });
-signalEl.addEventListener('change', updateRiskPreview);
-riskModeEl.addEventListener('change', () => {
-  applyRiskPreset();
-  updateRiskPreview();
-});
+// 시장 신호등(signal)과 리스크 기준(riskMode)은 UI에서 제거됨
+// 기존 코드 호환성을 위해 hidden 상태로 유지
 riskEl.addEventListener('input', updateRiskPreview);
 
 // --- 포지션 사이징 계산 ---
@@ -585,7 +583,6 @@ calcForm.addEventListener('submit', (e) => {
   lastCalc = {
     symbol: calcSymbolEl.value.trim().toUpperCase(),
     mode: modeEl.value,
-    signal: signalEl.value,
     appliedRiskPercent,
     capital,
     entry,
@@ -600,7 +597,7 @@ calcForm.addEventListener('submit', (e) => {
   };
 
   calcResult.innerHTML = `
-    모드: <strong>${modeEl.value}</strong> · 신호등: <strong>${signalEl.value.toUpperCase()}</strong><br>
+    모드: <strong>${modeEl.value}</strong><br>
     적용 리스크: <strong>${appliedRiskPercent.toFixed(2)}%</strong><br>
     손실폭(가격차): <strong>${perUnitRisk.toFixed(2)}</strong> (${lossWidthPercent.toFixed(2)}%)<br>
     최대 손실금액: <strong>${formatKRW(riskAmount.toFixed(0))}</strong><br>
@@ -633,10 +630,13 @@ addPositionBtn.addEventListener('click', () => {
   const rows = loadPositions();
   const entryDate = toDateString(new Date());
   const currentMode = modeEl.value;
+  // 매도예정일: 달력에서 직접 선택한 값 우선, 없으면 D+5(일봉)/D+7(주봉) 자동 계산
+  const userSellDate = calcSellDateEl ? calcSellDateEl.value : '';
+  const autoSellDate = addDays(entryDate, currentMode === 'WEEK' ? 7 : 5);
   rows.unshift({
     createdAt: new Date().toLocaleString('ko-KR'),
     entryDate,
-    sellDate: addDays(entryDate, currentMode === 'WEEK' ? 7 : 5),
+    sellDate: userSellDate || autoSellDate,
     symbol: lastCalc.symbol || '-',
     qty: Math.floor(lastCalc.qty),
     entry: Math.round(lastCalc.entry),
@@ -923,6 +923,8 @@ function init() {
   if (pSellDateEl) pSellDateEl.value = addDays(today, 5);
   const pModeEl = document.getElementById('pMode');
   if (pModeEl) pModeEl.value = modeEl.value;
+  // 계산기 내 매도예정일 달력 기본값 설정 (D+5)
+  if (calcSellDateEl) calcSellDateEl.value = addDays(today, 5);
   syncAllViews();
 }
 
